@@ -1,7 +1,6 @@
 // pages/index.js
 import { useState, useRef } from "react";
 import Head from "next/head";
-import "../styles/globals.css";
 
 export default function Home() {
   const [history, setHistory] = useState([]); // {role, content}
@@ -11,7 +10,7 @@ export default function Home() {
 
   const appendMessage = (role, text) => {
     setHistory(prev => [...prev, { role, content: text }]);
-    setTimeout(()=> messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth"}), 50);
+    setTimeout(() => messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" }), 50);
   };
 
   const handleSubmit = async (e) => {
@@ -21,7 +20,6 @@ export default function Home() {
     setInput("");
     appendMessage("user", text);
 
-    // create messages payload (client-side history)
     const payloadMessages = history.concat([{ role: "user", content: text }]);
 
     setLoading(true);
