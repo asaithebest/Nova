@@ -7,19 +7,15 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {};
-  // messages attendu : [{role:"user", content:"..."}, ...]
   const clientMessages = Array.isArray(body.messages) ? body.messages : (body.message ? [{role:"user", content: body.message}] : []);
 
-  // system prompt (personnalise)
   const SYSTEM_PROMPT = {
     role: "system",
     content: "Tu es Nova, un assistant utile et francophone. Reste poli, clair et concis."
   };
 
-  // limite local de l'historique pour ne pas dépasser les tokens
   const MAX_HISTORY = 10;
   const lastMessages = clientMessages.slice(-MAX_HISTORY);
-
   const messages = [SYSTEM_PROMPT, ...lastMessages];
 
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
@@ -47,7 +43,6 @@ export default async function handler(req, res) {
     const data = await resp.json();
 
     if (!resp.ok) {
-      // renvoie l'erreur brute d'OpenAI
       return res.status(resp.status).json({ error: data });
     }
 
