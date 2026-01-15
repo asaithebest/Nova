@@ -938,3 +938,38 @@ a,
 .suggestion-card {
   transition-duration: 300ms;
 }
+
+/* Formatage de texte amélioré */
+.text strong {
+  font-weight: 700;
+  color: #fff;
+}
+
+.text em {
+  font-style: italic;
+  color: #d0d0d0;
+}
+
+.text br {
+  display: block;
+  content: "";
+  margin: 8px 0;
+}
+
+.text h1, .text h2, .text h3 {
+  font-weight: 700;
+  color: #fff;
+  margin: 16px 0 12px 0;
+}
+
+.text h1 {
+  font-size: 24px;
+}
+
+.text h2 {
+  font-size: 20px;
+}
+
+.text h3 {
+  font-size: 18px;
+}
