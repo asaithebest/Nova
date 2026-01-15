@@ -9,8 +9,13 @@ export default function Home() {
   const messagesRef = useRef(null);
 
   const appendMessage = (role, text) => {
-    setHistory(prev => [...prev, { role, content: text }]);
-    setTimeout(() => messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" }), 50);
+    setHistory(prev => {
+      const next = [...prev, { role, content: text }];
+      return next;
+    });
+    setTimeout(() => {
+      messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" });
+    }, 50);
   };
 
   const handleSubmit = async (e) => {
@@ -20,6 +25,7 @@ export default function Home() {
     setInput("");
     appendMessage("user", text);
 
+    // construit le payload à envoyer au backend
     const payloadMessages = history.concat([{ role: "user", content: text }]);
 
     setLoading(true);
@@ -31,7 +37,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) {
-        appendMessage("assistant", `Erreur: ${JSON.stringify(data)}`);
+        appendMessage("assistant", `Erreur: ${data?.error?.message || JSON.stringify(data)}`);
       } else {
         appendMessage("assistant", data.reply || "Pas de réponse.");
       }
