@@ -1,5 +1,4 @@
 // pages/api/chat.js
-import fetch from "node-fetch";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -7,7 +6,9 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {};
-  const clientMessages = Array.isArray(body.messages) ? body.messages : (body.message ? [{role:"user", content: body.message}] : []);
+  const clientMessages = Array.isArray(body.messages)
+    ? body.messages
+    : (body.message ? [{ role: "user", content: body.message }] : []);
 
   const SYSTEM_PROMPT = {
     role: "system",
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
   const MODEL = process.env.MODEL || "gpt-3.5-turbo";
 
   if (!OPENAI_KEY) {
-    return res.status(500).json({ error: "OPENAI_API_KEY non défini sur le serveur." });
+    return res.status(500).json({ error: { message: "OPENAI_API_KEY non défini sur le serveur." } });
   }
 
   try {
@@ -43,6 +44,7 @@ export default async function handler(req, res) {
     const data = await resp.json();
 
     if (!resp.ok) {
+      // renvoie l'erreur d'OpenAI (401, 429, etc.)
       return res.status(resp.status).json({ error: data });
     }
 
@@ -52,6 +54,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ reply, usage });
   } catch (err) {
     console.error("API error:", err);
-    return res.status(500).json({ error: "Erreur interne serveur" });
+    return res.status(500).json({ error: { message: "Erreur interne serveur" } });
   }
 }
