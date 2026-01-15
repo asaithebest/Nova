@@ -3,6 +3,20 @@ import Head from "next/head";
 import Image from "next/image";
 
 function Message({ role, content }) {
+  // Fonction pour formater le texte avec markdown basique
+  const formatContent = (text) => {
+    // Remplacer **texte** par <strong>texte</strong>
+    let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Remplacer les sauts de ligne par <br>
+    formatted = formatted.replace(/\n/g, '<br>');
+    
+    // Gérer les listes numérotées
+    formatted = formatted.replace(/(\d+)\.\s/g, '<br><strong>$1.</strong> ');
+    
+    return formatted;
+  };
+
   return (
     <div className={`message ${role}`}>
       <div className="message-content">
@@ -13,7 +27,10 @@ function Message({ role, content }) {
             "U"
           )}
         </div>
-        <div className="text">{content}</div>
+        <div 
+          className="text" 
+          dangerouslySetInnerHTML={{ __html: formatContent(content) }}
+        />
       </div>
     </div>
   );
@@ -99,14 +116,12 @@ export default function Home() {
     }
 
     if (authMode === "register") {
-      // Check if user exists
       const existingUser = localStorage.getItem(`zero_user_${username}`);
       if (existingUser) {
         alert("Username already exists");
         return;
       }
 
-      // Create new user
       const newUser = { username, password, createdAt: new Date().toISOString() };
       localStorage.setItem(`zero_user_${username}`, JSON.stringify(newUser));
       localStorage.setItem("zero_session", JSON.stringify(newUser));
@@ -116,7 +131,6 @@ export default function Home() {
       setUsername("");
       setPassword("");
     } else {
-      // Login
       const userData = localStorage.getItem(`zero_user_${username}`);
       if (!userData) {
         alert("User not found");
@@ -172,7 +186,6 @@ export default function Home() {
   function updateCurrentConversation(newMessages) {
     setConversations(prev => prev.map(conv => {
       if (conv.id === currentConvId) {
-        // Auto-generate title from first message
         const title = newMessages.length > 0 && conv.title === "New Chat"
           ? newMessages[0].content.substring(0, 30) + "..."
           : conv.title;
@@ -194,9 +207,15 @@ export default function Home() {
     const text = input.trim();
     if (!text || loading) return;
 
-    // Create conversation if none exists
     if (!currentConvId) {
-      createNewConversation();
+      const newConv = {
+        id: Date.now().toString(),
+        title: "New Chat",
+        messages: [],
+        createdAt: new Date().toISOString()
+      };
+      setConversations([newConv, ...conversations]);
+      setCurrentConvId(newConv.id);
     }
 
     const newMessages = [...messages, { role: "user", content: text }];
@@ -230,16 +249,16 @@ export default function Home() {
     return (
       <>
         <Head>
-          <title>ZeroGPT</title>
+          <title>ZeroGPT - AI Assistant</title>
           <meta name="viewport" content="width=device-width,initial-scale=1" />
         </Head>
 
         <div className="landing-page">
           <div className="landing-content">
             <div className="logo-large">
-              <Image src="/logo.png" alt="Zero" width={120} height={120} />
+              <Image src="/logo.png" alt="ZeroGPT" width={120} height={120} />
             </div>
-            <h1 className="landing-title">Welcome to ZeroGPT</h1>
+            <h1 className="landing-title">ZeroGPT</h1>
             <p className="landing-subtitle">Powered by GPT-4o | By Astra</p>
             
             <div className="landing-buttons">
@@ -254,6 +273,25 @@ export default function Home() {
                 onClick={() => { setAuthMode("login"); setShowAuthModal(true); }}
               >
                 Sign In
+              </button>
+            </div>
+
+            <div className="features-grid">
+              <div className="feature-card-mini">
+                <div className="feature-icon-mini">🚀</div>
+                <div className="feature-text-mini">Lightning Fast</div>
+              </div>
+              <div className="feature-card-mini">
+                <div className="feature-icon-mini">🔒</div>
+                <div className="feature-text-mini">Secure & Private</div>
+              </div>
+              <div className="feature-card-mini">
+                <div className="feature-icon-mini">💎</div>
+                <div className="feature-text-mini">GPT-4o Powered</div>
+              </div>
+            </div>
+          </div>
+
           {showAuthModal && (
             <div className="modal-overlay" onClick={() => setShowAuthModal(false)}>
               <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -263,7 +301,7 @@ export default function Home() {
                   {authMode === "login" ? "Welcome Back" : "Create Account"}
                 </h2>
                 <p className="modal-subtitle">
-                  {authMode === "login" ? "Sign in to continue" : "Join Zero today"}
+                  {authMode === "login" ? "Sign in to continue" : "Join ZeroGPT today"}
                 </p>
 
                 <form onSubmit={handleAuth}>
@@ -312,7 +350,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Zero - Chat</title>
+        <title>ZeroGPT - Chat</title>
         <meta name="viewport" content="width=device-width,initial-scale=1" />
       </Head>
 
@@ -360,7 +398,7 @@ export default function Home() {
           {messages.length === 0 ? (
             <div className="empty-state">
               <div className="logo-welcome">
-                <Image src="/logo.png" alt="Zero" width={80} height={80} />
+                <Image src="/logo.png" alt="ZeroGPT" width={80} height={80} />
               </div>
               <h1>How can I help you today?</h1>
             </div>
@@ -373,7 +411,7 @@ export default function Home() {
                 <div className="message assistant">
                   <div className="message-content">
                     <div className="avatar">
-                      <Image src="/logo.png" alt="Zero" width={40} height={40} />
+                      <Image src="/logo.png" alt="ZeroGPT" width={40} height={40} />
                     </div>
                     <div className="typing-indicator">
                       <span></span>
@@ -392,7 +430,7 @@ export default function Home() {
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Message Zero"
+                placeholder="Message ZeroGPT"
                 rows="1"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -413,7 +451,6 @@ export default function Home() {
                 </svg>
               </button>
             </form>
-            <div className="input-footer">Zero can make mistakes. Check important info.</div>
           </div>
         </main>
       </div>
