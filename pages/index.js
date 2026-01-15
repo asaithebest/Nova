@@ -1,3 +1,4 @@
+// pages/index.js
 import { useState } from "react";
 import Head from "next/head";
 
@@ -6,48 +7,67 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function sendMessage(e) {
-    e.preventDefault();
-    if (!input.trim()) return;
+  function pushMessage(role, content) {
+    setMessages(prev => [...prev, { role, content }]);
+  }
 
-    const newMessages = [...messages, { role: "user", content: input }];
+  async function sendMessage(e) {
+    e?.preventDefault();
+    const text = input.trim();
+    if (!text) return;
+
+    const newMessages = [...messages, { role: "user", content: text }];
     setMessages(newMessages);
     setInput("");
     setLoading(true);
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: newMessages })
-    });
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: newMessages })
+      });
 
-    const data = await res.json();
-    setLoading(false);
+      const data = await res.json().catch(() => null);
 
-    if (!res.ok) {
-      setMessages([
-        ...newMessages,
-        { role: "assistant", content: "Erreur : " + data.error.message }
-      ]);
-      return;
+      if (!res.ok) {
+        // extraire un message d'erreur lisible, fallback si nécessaire
+        const errMsg =
+          data?.error?.message ||
+          data?.error ||
+          (typeof data === "string" ? data : null) ||
+          JSON.stringify(data) ||
+          `HTTP ${res.status}`;
+        pushMessage("assistant", `Erreur : ${errMsg}`);
+      } else {
+        const reply =
+          data?.reply ??
+          data?.choices?.[0]?.message?.content ??
+          data?.message ??
+          "Pas de réponse.";
+        pushMessage("assistant", reply);
+      }
+    } catch (err) {
+      pushMessage("assistant", `Erreur réseau : ${err?.message || String(err)}`);
+    } finally {
+      setLoading(false);
     }
-
-    setMessages([
-      ...newMessages,
-      { role: "assistant", content: data.reply }
-    ]);
   }
 
   return (
     <>
-      <Head><title>Nova GPT-4</title></Head>
+      <Head>
+        <title>Nova GPT-4</title>
+      </Head>
 
       <main style={{ padding: 20, maxWidth: 800, margin: "auto" }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{ marginBottom: 12 }}>
-            <strong>{m.role === "user" ? "Toi" : "Nova"} :</strong> {m.content}
-          </div>
-        ))}
+        <div style={{ marginBottom: 16 }}>
+          {messages.map((m, i) => (
+            <div key={i} style={{ marginBottom: 12 }}>
+              <strong>{m.role === "user" ? "Toi" : "Nova"} :</strong> {m.content}
+            </div>
+          ))}
+        </div>
 
         <form onSubmit={sendMessage}>
           <input
