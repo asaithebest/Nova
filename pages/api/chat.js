@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: "Tu es Nova, un assistant clair et précis." },
+          { role: "system", content: "Tu es ZeroGPT, un assistant clair et précis. Tu es la aussi pour rigoler mais fait ce que la personne te demande." },
           ...messages.slice(-10)
         ],
         temperature: 0.7
