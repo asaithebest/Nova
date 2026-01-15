@@ -230,7 +230,7 @@ export default function Home() {
     return (
       <>
         <Head>
-          <title>Zero - AI Assistant</title>
+          <title>ZeroGPT</title>
           <meta name="viewport" content="width=device-width,initial-scale=1" />
         </Head>
 
@@ -239,8 +239,8 @@ export default function Home() {
             <div className="logo-large">
               <Image src="/logo.png" alt="Zero" width={120} height={120} />
             </div>
-            <h1 className="landing-title">Welcome to Zero</h1>
-            <p className="landing-subtitle">Your intelligent AI assistant powered by GPT-4o</p>
+            <h1 className="landing-title">Welcome to ZeroGPT</h1>
+            <p className="landing-subtitle">Powered by GPT-4o | By Astra</p>
             
             <div className="landing-buttons">
               <button 
@@ -254,25 +254,6 @@ export default function Home() {
                 onClick={() => { setAuthMode("login"); setShowAuthModal(true); }}
               >
                 Sign In
-              </button>
-            </div>
-
-            <div className="features-grid">
-              <div className="feature-card-mini">
-                <div className="feature-icon-mini">🚀</div>
-                <div className="feature-text-mini">Lightning Fast</div>
-              </div>
-              <div className="feature-card-mini">
-                <div className="feature-icon-mini">🔒</div>
-                <div className="feature-text-mini">Secure & Private</div>
-              </div>
-              <div className="feature-card-mini">
-                <div className="feature-icon-mini">💎</div>
-                <div className="feature-text-mini">GPT-4o Powered</div>
-              </div>
-            </div>
-          </div>
-
           {showAuthModal && (
             <div className="modal-overlay" onClick={() => setShowAuthModal(false)}>
               <div className="modal" onClick={(e) => e.stopPropagation()}>
