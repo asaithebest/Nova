@@ -1,21 +1,45 @@
 // pages/index.js
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Head from "next/head";
 
+function Avatar({ who }) {
+  return (
+    <div className={`avatar ${who === "user" ? "user" : "assistant"}`}>
+      {who === "user" ? "T" : "N"}
+    </div>
+  );
+}
+
+function Message({ role, content }) {
+  return (
+    <div className={`message-row ${role === "user" ? "right" : "left"}`}>
+      <Avatar who={role === "user" ? "user" : "assistant"} />
+      <div className={`bubble ${role === "user" ? "user" : "assistant"}`}>
+        <pre className="msg">{content}</pre>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState([
+    { role: "assistant", content: "Salut — je suis Nova. Pose-moi une question !" }
+  ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [model, setModel] = useState(process.env.NEXT_PUBLIC_MODEL || "gpt-4");
+  const scrollRef = useRef();
 
-  function pushMessage(role, content) {
-    setMessages(prev => [...prev, { role, content }]);
-  }
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, loading]);
 
-  async function sendMessage(e) {
+  const push = (m) => setMessages((p) => [...p, m]);
+
+  async function handleSend(e) {
     e?.preventDefault();
     const text = input.trim();
     if (!text) return;
-
     const newMessages = [...messages, { role: "user", content: text }];
     setMessages(newMessages);
     setInput("");
@@ -25,30 +49,18 @@ export default function Home() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages })
+        body: JSON.stringify({ messages: newMessages, model })
       });
-
-      const data = await res.json().catch(() => null);
-
+      const data = await res.json();
       if (!res.ok) {
-        // extraire un message d'erreur lisible, fallback si nécessaire
-        const errMsg =
-          data?.error?.message ||
-          data?.error ||
-          (typeof data === "string" ? data : null) ||
-          JSON.stringify(data) ||
-          `HTTP ${res.status}`;
-        pushMessage("assistant", `Erreur : ${errMsg}`);
+        const msg = data?.message || (data?.error?.message) || JSON.stringify(data) || `HTTP ${res.status}`;
+        push({ role: "assistant", content: `Erreur : ${msg}` });
       } else {
-        const reply =
-          data?.reply ??
-          data?.choices?.[0]?.message?.content ??
-          data?.message ??
-          "Pas de réponse.";
-        pushMessage("assistant", reply);
+        const reply = data?.reply ?? data?.choices?.[0]?.message?.content ?? "Pas de réponse.";
+        push({ role: "assistant", content: reply });
       }
     } catch (err) {
-      pushMessage("assistant", `Erreur réseau : ${err?.message || String(err)}`);
+      push({ role: "assistant", content: `Erreur réseau : ${err?.message || String(err)}` });
     } finally {
       setLoading(false);
     }
@@ -57,29 +69,82 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Nova GPT-4</title>
+        <title>Nova — Assistant</title>
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
       </Head>
 
-      <main style={{ padding: 20, maxWidth: 800, margin: "auto" }}>
-        <div style={{ marginBottom: 16 }}>
-          {messages.map((m, i) => (
-            <div key={i} style={{ marginBottom: 12 }}>
-              <strong>{m.role === "user" ? "Toi" : "Nova"} :</strong> {m.content}
+      <div className="app">
+        <aside className="leftbar">
+          <div className="brand">
+            <div className="logo">N</div>
+            <div>
+              <h1>Nova</h1>
+              <small>Assistant</small>
             </div>
-          ))}
-        </div>
+          </div>
 
-        <form onSubmit={sendMessage}>
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="Écris un message..."
-            style={{ width: "100%", padding: 10 }}
-          />
-        </form>
+          <div className="controls">
+            <label className="model-label">Modèle</label>
+            <select value={model} onChange={(e) => setModel(e.target.value)}>
+              <option value="gpt-4">gpt-4</option>
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+            </select>
+            <button
+              className="clear"
+              onClick={() => {
+                setMessages([{ role: "assistant", content: "Conversation réinitialisée. Salut !" }]);
+              }}
+            >
+              Nouvelle conversation
+            </button>
+          </div>
 
-        {loading && <p>Nova écrit…</p>}
-      </main>
+          <footer className="left-footer">Déployé sur Vercel — Key côté serveur</footer>
+        </aside>
+
+        <main className="chat-area">
+          <div className="header-area">
+            <h2>Nova</h2>
+            <div className="header-note">Nova utilise l'API OpenAI côté serveur.</div>
+          </div>
+
+          <div className="messages" ref={scrollRef}>
+            {messages.map((m, i) => (
+              <Message key={i} role={m.role} content={m.content} />
+            ))}
+            {loading && (
+              <div className="message-row left">
+                <div className="avatar assistant">N</div>
+                <div className="bubble assistant">
+                  <div className="typing">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <form className="composer" onSubmit={handleSend}>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Écris un message... (Enter = envoyer, Shift+Enter = saut de ligne)"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+            />
+            <button type="submit" aria-label="Envoyer" disabled={loading || !input.trim()}>
+              {loading ? "…" : "Envoyer"}
+            </button>
+          </form>
+        </main>
+      </div>
     </>
   );
 }
