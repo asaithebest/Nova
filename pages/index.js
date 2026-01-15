@@ -167,3 +167,24 @@ export default function Home() {
     </>
   );
 }
+
+const [conversations, setConversations] = useState([]);
+
+// Charger les conversations au montage
+useEffect(() => {
+  fetch('/api/conversations')
+    .then(res => res.json())
+    .then(data => setConversations(data));
+}, []);
+
+// Dans la section .conversations du JSX :
+<div className="conversations">
+  <div className="conv-section">
+    <div className="conv-title">Today</div>
+    {conversations.map(conv => (
+      <div key={conv.id} className="conv-item" onClick={() => loadConversation(conv.id)}>
+        {conv.title}
+      </div>
+    ))}
+  </div>
+</div>
