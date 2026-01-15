@@ -22,7 +22,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: "Tu es Nova, un assistant clair et précis." },
           ...messages.slice(-10)
