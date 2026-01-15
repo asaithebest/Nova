@@ -6,11 +6,7 @@ function Message({ role, content }) {
     <div className={`message ${role}`}>
       <div className="message-content">
         <div className="avatar">
-          {role === "assistant" && (
-            <svg width="41" height="41" viewBox="0 0 41 41" fill="none">
-              <circle cx="20.5" cy="20.5" r="20.5" fill="#10A37F"/>
-            </svg>
-          )}
+          {role === "assistant" ? "Z" : "U"}
         </div>
         <div className="text">
           {content}
@@ -74,7 +70,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>ChatGPT</title>
+        <title>Zero</title>
         <meta name="viewport" content="width=device-width,initial-scale=1" />
       </Head>
 
@@ -90,7 +86,6 @@ export default function Home() {
           </div>
           
           <div className="conversations">
-            {/* Placeholder for conversation history */}
             <div className="conv-section">
               <div className="conv-title">Today</div>
             </div>
@@ -117,11 +112,7 @@ export default function Home() {
               {loading && (
                 <div className="message assistant">
                   <div className="message-content">
-                    <div className="avatar">
-                      <svg width="41" height="41" viewBox="0 0 41 41" fill="none">
-                        <circle cx="20.5" cy="20.5" r="20.5" fill="#10A37F"/>
-                      </svg>
-                    </div>
+                    <div className="avatar">Z</div>
                     <div className="typing-indicator">
                       <span></span>
                       <span></span>
@@ -139,7 +130,7 @@ export default function Home() {
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Message ChatGPT"
+                placeholder="Message Zero"
                 rows="1"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -159,7 +150,7 @@ export default function Home() {
               </button>
             </form>
             <div className="input-footer">
-              ChatGPT can make mistakes. Check important info.
+              Zero can make mistakes. Check important info.
             </div>
           </div>
         </main>
@@ -167,24 +158,3 @@ export default function Home() {
     </>
   );
 }
-
-const [conversations, setConversations] = useState([]);
-
-// Charger les conversations au montage
-useEffect(() => {
-  fetch('/api/conversations')
-    .then(res => res.json())
-    .then(data => setConversations(data));
-}, []);
-
-// Dans la section .conversations du JSX :
-<div className="conversations">
-  <div className="conv-section">
-    <div className="conv-title">Today</div>
-    {conversations.map(conv => (
-      <div key={conv.id} className="conv-item" onClick={() => loadConversation(conv.id)}>
-        {conv.title}
-      </div>
-    ))}
-  </div>
-</div>
