@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Head from "next/head";
+import Image from "next/image";
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
@@ -10,49 +11,48 @@ export default function Home() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, loading]);
 
-  async function sendMessage(e) {
-    e?.preventDefault();
-    if (!input.trim() && !file) return;
+  const format = (text) => {
+    return text
+      .replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/`(.*?)`/g, "<code>$1</code>")
+      .replace(/\n/g, "<br>");
+  };
 
-    const userMessage = {
-      role: "user",
-      content: input || file.name,
-    };
+  async function send() {
+    if ((!input.trim() && !file) || loading) return;
 
-    setMessages((m) => [...m, userMessage]);
+    const userMsg = { role: "user", content: input };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInput("");
     setLoading(true);
 
-    const formData = new FormData();
-    formData.append("message", input);
-    if (file) formData.append("file", file);
-
-    setFile(null);
+    const form = new FormData();
+    form.append("messages", JSON.stringify(newMessages));
+    if (file) form.append("file", file);
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        body: formData,
+        body: form,
       });
 
       const data = await res.json();
-
+      setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
+    } catch (e) {
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: data.reply || "No response." },
-      ]);
-    } catch {
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: "Server error." },
+        { role: "assistant", content: "Error. Please try again." },
       ]);
     } finally {
       setLoading(false);
+      setFile(null);
     }
   }
-
   return (
     <>
       <Head>
