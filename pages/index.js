@@ -5,47 +5,35 @@ import Image from "next/image";
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
-
   const bottomRef = useRef(null);
-  const fileInputRef = useRef(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 0) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, loading]);
 
   async function sendMessage(e) {
     e?.preventDefault();
-    if ((!input.trim() && !file) || loading) return;
+    if (!input.trim() || loading) return;
 
-    const userMsg = {
-      role: "user",
-      content: input || (file ? `File uploaded: ${file.name}` : ""),
-    };
-
-    const newMessages = [...messages, userMsg];
+    const newMessages = [...messages, { role: "user", content: input }];
     setMessages(newMessages);
     setInput("");
-    setFile(null);
     setLoading(true);
-
-    const formData = new FormData();
-    formData.append("messages", JSON.stringify(newMessages));
-    if (file) formData.append("file", file);
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: newMessages }),
       });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || "API error");
 
-      setMessages(prev => [
-        ...prev,
-        { role: "assistant", content: data.reply },
-      ]);
+      setMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
     } catch (err) {
       setMessages(prev => [
         ...prev,
@@ -56,225 +44,227 @@ export default function Home() {
     }
   }
 
+  const isEmpty = messages.length === 0;
+
   return (
     <>
       <Head>
         <title>NovaGPT</title>
       </Head>
 
-      {/* BRAND */}
-      <div className="top-left">
-        <Image src="/logo.png" alt="NovaGPT" width={26} height={26} />
+      {/* TOP LEFT */}
+      <div className="top-bar">
+        <Image src="/logo.png" alt="NovaGPT" width={22} height={22} />
         <span>NovaGPT</span>
       </div>
 
-      <div className="page">
-        <main className={`chat ${messages.length === 0 ? "centered" : ""}`}>
-          {messages.length === 0 && (
-            <h1 className="title fade-in">How can I help you today?</h1>
-          )}
+      <div className={`page ${isEmpty ? "empty" : "chatting"}`}>
+        {/* CENTER ZONE */}
+        {isEmpty && (
+          <div className="center-zone">
+            <h1>How can I help you today?</h1>
 
-          {messages.map((m, i) => (
-            <div key={i} className={`message ${m.role} slide-in`}>
-              <div className="bubble">{m.content}</div>
-            </div>
-          ))}
+            <form className="input-pill" onSubmit={sendMessage}>
+              <button type="button" className="icon">＋</button>
 
-          {loading && (
-            <div className="message assistant slide-in">
-              <div className="bubble typing">
-                <span className="dot"></span>
-                <span className="dot"></span>
-                <span className="dot"></span>
+              <input
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder="Message NovaGPT"
+              />
+
+              <button
+                type="submit"
+                className="send"
+                disabled={!input.trim()}
+              >
+                ↑
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* CHAT */}
+        {!isEmpty && (
+          <>
+            <main className="chat">
+              {messages.map((m, i) => (
+                <div key={i} className={`msg ${m.role}`}>
+                  <div className="bubble">{m.content}</div>
+                </div>
+              ))}
+
+              {loading && (
+                <div className="msg assistant">
+                  <div className="bubble typing">Thinking…</div>
+                </div>
+              )}
+
+              <div ref={bottomRef} />
+            </main>
+
+            {/* BOTTOM INPUT */}
+            <form className="bottom-input" onSubmit={sendMessage}>
+              <div className="input-pill">
+                <button type="button" className="icon">＋</button>
+
+                <input
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  placeholder="Message NovaGPT"
+                />
+
+                <button
+                  type="submit"
+                  className="send"
+                  disabled={!input.trim()}
+                >
+                  ↑
+                </button>
               </div>
-            </div>
-          )}
-
-          <div ref={bottomRef} />
-        </main>
-
-        {/* INPUT */}
-        <form className="composer" onSubmit={sendMessage}>
-          <input
-            type="file"
-            hidden
-            ref={fileInputRef}
-            onChange={e => setFile(e.target.files[0])}
-          />
-
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={() => fileInputRef.current.click()}
-          >
-            📎
-          </button>
-
-          <input
-            className="text-input"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="Message NovaGPT…"
-          />
-
-          <button
-            type="submit"
-            className="send-btn"
-            disabled={loading || (!input.trim() && !file)}
-          >
-            ➤
-          </button>
-        </form>
+            </form>
+          </>
+        )}
       </div>
 
-      {/* STYLES */}
       <style jsx>{`
         body {
           margin: 0;
-          background: #000;
+          background: #202020;
           color: #fff;
+          font-family: system-ui, sans-serif;
         }
 
-        .top-left {
+        .top-bar {
           position: fixed;
-          top: 16px;
-          left: 20px;
+          top: 12px;
+          left: 16px;
           display: flex;
+          gap: 8px;
           align-items: center;
-          gap: 10px;
           font-weight: 600;
           z-index: 10;
+          opacity: 0.9;
         }
 
         .page {
           min-height: 100vh;
+          transition: all 0.4s ease;
+        }
+
+        /* EMPTY STATE */
+        .center-zone {
+          height: 100vh;
           display: flex;
           flex-direction: column;
           align-items: center;
+          justify-content: center;
+          gap: 28px;
         }
 
+        .center-zone h1 {
+          font-size: 28px;
+          font-weight: 400;
+          text-align: center;
+        }
+
+        /* CHAT */
         .chat {
-          width: 100%;
           max-width: 760px;
-          flex: 1;
-          padding: 120px 20px 40px;
+          margin: 0 auto;
+          padding: 120px 20px 120px;
           display: flex;
           flex-direction: column;
           gap: 18px;
         }
 
-        .chat.centered {
-          justify-content: center;
-          align-items: center;
-        }
-
-        .title {
-          font-size: 28px;
-          font-weight: 400;
-          opacity: 0.85;
-        }
-
-        .message {
+        .msg {
           display: flex;
+          animation: appear 0.25s ease;
         }
 
-        .message.user {
+        .msg.user {
           justify-content: flex-end;
         }
 
         .bubble {
           max-width: 80%;
           padding: 14px 16px;
-          background: #0d0d0d;
-          border: 1px solid #222;
+          background: #111;
           border-radius: 12px;
-          line-height: 1.6;
-          white-space: pre-wrap;
+          line-height: 1.55;
         }
 
-        /* --- INPUT --- */
+        .typing {
+          opacity: 0.6;
+          font-style: italic;
+        }
 
-        .composer {
-          position: sticky;
-          bottom: 0;
-          width: 100%;
+        /* INPUT */
+        .input-pill {
           display: flex;
-          justify-content: center;
-          gap: 8px;
-          padding: 24px 16px 32px;
-          background: linear-gradient(
-            transparent,
-            rgba(0, 0, 0, 0.85) 40%
-          );
+          align-items: center;
+          gap: 10px;
+          background: #2a2a2a;
+          border-radius: 999px;
+          padding: 10px 12px;
+          width: 560px;
+          max-width: calc(100vw - 32px);
         }
 
-        .icon-btn {
-          background: #0d0d0d;
-          border: 1px solid #222;
-          color: #fff;
-          border-radius: 10px;
-          padding: 0 12px;
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-
-        .icon-btn:hover {
-          background: #151515;
-        }
-
-        .text-input {
+        .input-pill input {
           flex: 1;
-          padding: 14px 16px;
-          background: #0d0d0d;
-          border: 1px solid #222;
-          border-radius: 12px;
-          color: #fff;
-          outline: none;
-          transition: border 0.2s;
-        }
-
-        .text-input:focus {
-          border-color: #444;
-        }
-
-        .send-btn {
-          background: #fff;
-          color: #000;
-          border-radius: 10px;
-          padding: 0 16px;
+          background: transparent;
           border: none;
+          outline: none;
+          color: white;
+          font-size: 14px;
+        }
+
+        .icon {
+          background: none;
+          border: none;
+          color: #aaa;
+          font-size: 18px;
           cursor: pointer;
-          transition: transform 0.1s ease, opacity 0.2s;
         }
 
-        .send-btn:active {
-          transform: scale(0.95);
+        .send {
+          background: white;
+          color: black;
+          border: none;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          cursor: pointer;
         }
 
-        .send-btn:disabled {
+        .send:disabled {
           opacity: 0.3;
         }
 
-        /* --- ANIMATIONS --- */
-
-        .fade-in {
-          animation: fade 0.6s ease;
+        .bottom-input {
+          position: fixed;
+          bottom: 20px;
+          left: 0;
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          animation: slideUp 0.4s ease;
         }
 
-        .slide-in {
-          animation: slide 0.25s ease;
-        }
-
-        @keyframes fade {
+        @keyframes slideUp {
           from {
+            transform: translateY(30px);
             opacity: 0;
           }
           to {
+            transform: none;
             opacity: 1;
           }
         }
 
-        @keyframes slide {
+        @keyframes appear {
           from {
             opacity: 0;
             transform: translateY(6px);
@@ -282,42 +272,6 @@ export default function Home() {
           to {
             opacity: 1;
             transform: none;
-          }
-        }
-
-        /* TYPING DOTS */
-
-        .typing {
-          display: flex;
-          gap: 6px;
-        }
-
-        .dot {
-          width: 6px;
-          height: 6px;
-          background: #fff;
-          border-radius: 50%;
-          opacity: 0.3;
-          animation: blink 1.4s infinite both;
-        }
-
-        .dot:nth-child(2) {
-          animation-delay: 0.2s;
-        }
-
-        .dot:nth-child(3) {
-          animation-delay: 0.4s;
-        }
-
-        @keyframes blink {
-          0% {
-            opacity: 0.3;
-          }
-          50% {
-            opacity: 1;
-          }
-          100% {
-            opacity: 0.3;
           }
         }
       `}</style>
