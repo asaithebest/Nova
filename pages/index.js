@@ -35,7 +35,7 @@ export default function Home() {
     } catch (err) {
       setMessages(prev => [
         ...prev,
-        { role: "assistant", content: "⚠️ Error: " + err.message },
+        { role: "assistant", content: "Error: " + err.message },
       ]);
     } finally {
       setLoading(false);
@@ -49,18 +49,17 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <div className="page">
-        <header className="top">
-          <Image src="/logo.png" alt="NovaGPT" width={28} height={28} />
-          <span>NovaGPT</span>
-        </header>
+      {/* TOP BAR */}
+      <div className="top-bar">
+        <Image src="/logo.png" alt="NovaGPT" width={26} height={26} />
+        <span>NovaGPT</span>
+      </div>
 
-        <main className="chat">
+      {/* MAIN */}
+      <div className="container">
+        <main className={`chat ${messages.length === 0 ? "centered" : ""}`}>
           {messages.length === 0 && (
-            <div className="welcome">
-              <Image src="/logo.png" alt="NovaGPT" width={64} height={64} />
-              <h1>How can I help you today?</h1>
-            </div>
+            <h1 className="title">How can I help you today?</h1>
           )}
 
           {messages.map((m, i) => (
@@ -71,129 +70,153 @@ export default function Home() {
 
           {loading && (
             <div className="message assistant">
-              <div className="bubble typing">NovaGPT is typing…</div>
+              <div className="bubble typing">Thinking…</div>
             </div>
           )}
           <div ref={bottomRef} />
         </main>
 
-        <form className="input-bar" onSubmit={sendMessage}>
+        {/* INPUT */}
+        <form className="input-wrapper" onSubmit={sendMessage}>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="Message NovaGPT…"
           />
           <button type="submit" disabled={loading || !input.trim()}>
-            ➤
+            ↵
           </button>
         </form>
       </div>
 
+      {/* STYLES */}
       <style jsx>{`
         * {
           box-sizing: border-box;
         }
+
         body {
           margin: 0;
         }
-        .page {
-          height: 100vh;
-          background: #0f0f0f;
-          color: #e5e5e5;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        .top {
+
+        .top-bar {
+          position: fixed;
+          top: 0;
+          left: 0;
           height: 56px;
           width: 100%;
           display: flex;
           align-items: center;
-          justify-content: center;
-          gap: 8px;
+          gap: 10px;
+          padding: 0 20px;
+          background: #000;
+          border-bottom: 1px solid #1a1a1a;
           font-weight: 600;
-          border-bottom: 1px solid #1f1f1f;
-          background: #0f0f0f;
+          z-index: 10;
         }
+
+        .container {
+          height: 100vh;
+          padding-top: 56px;
+          background: #000;
+          color: #fff;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
         .chat {
-          flex: 1;
           width: 100%;
           max-width: 720px;
-          padding: 24px;
+          flex: 1;
+          padding: 32px 24px;
           overflow-y: auto;
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 20px;
         }
-        .welcome {
-          margin-top: 20vh;
+
+        .chat.centered {
+          justify-content: center;
+          align-items: center;
+        }
+
+        .title {
+          font-size: 28px;
+          font-weight: 400;
+          opacity: 0.85;
+          animation: fadeUp 0.6s ease;
           text-align: center;
-          opacity: 0.9;
-          animation: fadeIn 0.6s ease;
         }
-        .welcome h1 {
-          margin-top: 16px;
-          font-size: 26px;
-          font-weight: 500;
-        }
+
         .message {
           display: flex;
-          animation: fadeIn 0.3s ease;
+          animation: fadeUp 0.3s ease;
         }
+
         .message.user {
           justify-content: flex-end;
         }
+
         .bubble {
           max-width: 80%;
-          padding: 12px 14px;
+          padding: 14px 16px;
           border-radius: 12px;
-          line-height: 1.5;
-          background: #1f1f1f;
+          background: #111;
+          border: 1px solid #222;
+          line-height: 1.55;
+          white-space: pre-wrap;
         }
+
         .message.user .bubble {
-          background: #2a2a2a;
+          background: #0a0a0a;
+          border-color: #333;
         }
+
         .typing {
           opacity: 0.6;
           font-style: italic;
         }
-        .input-bar {
+
+        .input-wrapper {
           width: 100%;
           max-width: 720px;
+          padding: 16px 24px 24px;
           display: flex;
-          gap: 8px;
-          padding: 16px;
-          border-top: 1px solid #1f1f1f;
-          background: #0f0f0f;
+          gap: 10px;
+          background: #000;
         }
-        .input-bar input {
+
+        .input-wrapper input {
           flex: 1;
-          padding: 12px 14px;
-          background: #1f1f1f;
-          border: none;
-          border-radius: 10px;
+          padding: 14px 16px;
+          font-size: 15px;
+          background: #0a0a0a;
           color: #fff;
+          border: 1px solid #222;
+          border-radius: 12px;
           outline: none;
-          font-size: 14px;
         }
-        .input-bar button {
+
+        .input-wrapper button {
           padding: 0 16px;
-          border-radius: 10px;
-          border: none;
-          cursor: pointer;
-          background: #19c37d;
+          background: #fff;
           color: #000;
-          font-size: 16px;
+          border: none;
+          border-radius: 12px;
+          font-size: 18px;
+          cursor: pointer;
         }
-        .input-bar button:disabled {
-          opacity: 0.4;
+
+        .input-wrapper button:disabled {
+          opacity: 0.3;
           cursor: not-allowed;
         }
 
-        @keyframes fadeIn {
+        @keyframes fadeUp {
           from {
             opacity: 0;
-            transform: translateY(4px);
+            transform: translateY(6px);
           }
           to {
             opacity: 1;
