@@ -5,8 +5,10 @@ import Image from "next/image";
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -14,24 +16,36 @@ export default function Home() {
 
   async function sendMessage(e) {
     e?.preventDefault();
-    if (!input.trim() || loading) return;
+    if ((!input.trim() && !file) || loading) return;
 
-    const newMessages = [...messages, { role: "user", content: input }];
+    const userMessage = {
+      role: "user",
+      content: input || (file ? `Uploaded file: ${file.name}` : ""),
+    };
+
+    const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
+    setFile(null);
     setLoading(true);
+
+    const formData = new FormData();
+    formData.append("messages", JSON.stringify(newMessages));
+    if (file) formData.append("file", file);
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
+        body: formData,
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || "API error");
 
-      setMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
+      setMessages(prev => [
+        ...prev,
+        { role: "assistant", content: data.reply },
+      ]);
     } catch (err) {
       setMessages(prev => [
         ...prev,
@@ -46,17 +60,15 @@ export default function Home() {
     <>
       <Head>
         <title>NovaGPT</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      {/* TOP BAR */}
-      <div className="top-bar">
+      {/* TOP LEFT BRAND */}
+      <div className="top-left">
         <Image src="/logo.png" alt="NovaGPT" width={26} height={26} />
         <span>NovaGPT</span>
       </div>
 
-      {/* MAIN */}
-      <div className="container">
+      <div className="page">
         <main className={`chat ${messages.length === 0 ? "centered" : ""}`}>
           {messages.length === 0 && (
             <h1 className="title">How can I help you today?</h1>
@@ -76,50 +88,60 @@ export default function Home() {
           <div ref={bottomRef} />
         </main>
 
-        {/* INPUT */}
-        <form className="input-wrapper" onSubmit={sendMessage}>
+        {/* INPUT BAR (CENTERED LIKE CHATGPT) */}
+        <form className="composer" onSubmit={sendMessage}>
           <input
+            type="file"
+            hidden
+            ref={fileInputRef}
+            onChange={e => setFile(e.target.files[0])}
+          />
+
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => fileInputRef.current.click()}
+          >
+            📎
+          </button>
+
+          <input
+            className="text-input"
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="Message NovaGPT…"
           />
-          <button type="submit" disabled={loading || !input.trim()}>
-            ↵
+
+          <button
+            type="submit"
+            className="send-btn"
+            disabled={loading || (!input.trim() && !file)}
+          >
+            ➤
           </button>
         </form>
       </div>
 
-      {/* STYLES */}
       <style jsx>{`
-        * {
-          box-sizing: border-box;
-        }
-
         body {
           margin: 0;
+          background: #000;
+          color: #fff;
         }
 
-        .top-bar {
+        .top-left {
           position: fixed;
-          top: 0;
-          left: 0;
-          height: 56px;
-          width: 100%;
+          top: 16px;
+          left: 20px;
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 0 20px;
-          background: #000;
-          border-bottom: 1px solid #1a1a1a;
           font-weight: 600;
           z-index: 10;
         }
 
-        .container {
-          height: 100vh;
-          padding-top: 56px;
-          background: #000;
-          color: #fff;
+        .page {
+          min-height: 100vh;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -127,13 +149,12 @@ export default function Home() {
 
         .chat {
           width: 100%;
-          max-width: 720px;
+          max-width: 760px;
           flex: 1;
-          padding: 32px 24px;
-          overflow-y: auto;
+          padding: 120px 20px 40px;
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: 18px;
         }
 
         .chat.centered {
@@ -145,13 +166,10 @@ export default function Home() {
           font-size: 28px;
           font-weight: 400;
           opacity: 0.85;
-          animation: fadeUp 0.6s ease;
-          text-align: center;
         }
 
         .message {
           display: flex;
-          animation: fadeUp 0.3s ease;
         }
 
         .message.user {
@@ -161,16 +179,11 @@ export default function Home() {
         .bubble {
           max-width: 80%;
           padding: 14px 16px;
-          border-radius: 12px;
-          background: #111;
+          background: #0d0d0d;
           border: 1px solid #222;
-          line-height: 1.55;
+          border-radius: 12px;
+          line-height: 1.6;
           white-space: pre-wrap;
-        }
-
-        .message.user .bubble {
-          background: #0a0a0a;
-          border-color: #333;
         }
 
         .typing {
@@ -178,50 +191,57 @@ export default function Home() {
           font-style: italic;
         }
 
-        .input-wrapper {
+        .composer {
+          position: sticky;
+          bottom: 0;
           width: 100%;
-          max-width: 720px;
-          padding: 16px 24px 24px;
           display: flex;
-          gap: 10px;
-          background: #000;
+          justify-content: center;
+          padding: 24px 16px 32px;
+          background: linear-gradient(
+            transparent,
+            rgba(0, 0, 0, 0.85) 40%
+          );
         }
 
-        .input-wrapper input {
-          flex: 1;
-          padding: 14px 16px;
-          font-size: 15px;
-          background: #0a0a0a;
-          color: #fff;
+        .composer > * {
+          max-width: 760px;
+        }
+
+        .composer {
+          gap: 8px;
+        }
+
+        .icon-btn {
+          background: #0d0d0d;
           border: 1px solid #222;
-          border-radius: 12px;
-          outline: none;
-        }
-
-        .input-wrapper button {
-          padding: 0 16px;
-          background: #fff;
-          color: #000;
-          border: none;
-          border-radius: 12px;
-          font-size: 18px;
+          color: #fff;
+          border-radius: 10px;
+          padding: 0 12px;
           cursor: pointer;
         }
 
-        .input-wrapper button:disabled {
-          opacity: 0.3;
-          cursor: not-allowed;
+        .text-input {
+          flex: 1;
+          padding: 14px 16px;
+          background: #0d0d0d;
+          border: 1px solid #222;
+          border-radius: 12px;
+          color: #fff;
+          outline: none;
         }
 
-        @keyframes fadeUp {
-          from {
-            opacity: 0;
-            transform: translateY(6px);
-          }
-          to {
-            opacity: 1;
-            transform: none;
-          }
+        .send-btn {
+          background: #fff;
+          color: #000;
+          border-radius: 10px;
+          padding: 0 16px;
+          border: none;
+          cursor: pointer;
+        }
+
+        .send-btn:disabled {
+          opacity: 0.3;
         }
       `}</style>
     </>
