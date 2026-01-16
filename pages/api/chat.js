@@ -6,13 +6,12 @@ export default async function handler(req, res) {
   }
 
   if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({
-      message: "OPENAI_API_KEY non défini sur le serveur"
-    });
+    return res.status(500).json({ message: "OPENAI_API_KEY non défini sur le serveur" });
   }
 
   const body = req.body || {};
   const messages = Array.isArray(body.messages) ? body.messages : [];
+  const model = body.model || process.env.MODEL || "gpt-4o";
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -22,16 +21,13 @@ export default async function handler(req, res) {
         "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model,
         messages: [
-          {
-            role: "system",
-            content:
-              "Tu es ZeroGPT, un assistant clair, drôle quand il faut, et très utile."
-          },
-          ...messages.slice(-10)
+          { role: "system", content: "Tu es Nova — assistant francophone, clair et utile." },
+          ...messages.slice(-12)
         ],
-        temperature: 0.7
+        temperature: 0.7,
+        max_tokens: 1000
       })
     });
 
@@ -41,10 +37,7 @@ export default async function handler(req, res) {
     try {
       data = JSON.parse(text);
     } catch {
-      return res.status(500).json({
-        message: "Réponse OpenAI invalide",
-        raw: text
-      });
+      return res.status(500).json({ message: "Réponse OpenAI non JSON", raw: text });
     }
 
     if (!response.ok) {
@@ -54,13 +47,9 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(200).json({
-      reply: data.choices[0].message.content
-    });
-
+    const reply = data?.choices?.[0]?.message?.content ?? null;
+    return res.status(200).json({ reply, raw: data });
   } catch (err) {
-    return res.status(500).json({
-      message: err?.message || "Erreur serveur"
-    });
+    return res.status(500).json({ message: err?.message || "Erreur serveur" });
   }
 }
