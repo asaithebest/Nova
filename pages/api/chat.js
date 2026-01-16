@@ -5,9 +5,7 @@ export default async function handler(req, res) {
   }
 
   if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({
-      message: "OPENAI_API_KEY non défini sur le serveur"
-    });
+    return res.status(500).json({ message: "OPENAI_API_KEY non défini sur le serveur" });
   }
 
   const { messages = [], model = "gpt-4" } = req.body || {};
@@ -22,10 +20,11 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "Tu es Nova, assistant clair, utile et naturel." },
+          { role: "system", content: "Tu es Nova, assistant francophone, clair et utile." },
           ...messages.slice(-12)
         ],
-        temperature: 0.7
+        temperature: 0.7,
+        max_tokens: 1000
       })
     });
 
@@ -39,11 +38,11 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      reply: data.choices[0].message.content
+      reply: data.choices?.[0]?.message?.content ?? ""
     });
   } catch (error) {
     return res.status(500).json({
-      message: error.message || "Erreur serveur"
+      message: error?.message ?? "Erreur serveur"
     });
   }
 }
