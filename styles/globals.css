@@ -1,256 +1,223 @@
-/* ================= RESET ================= */
+/* RESET */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
-html,
-body {
+html, body {
   height: 100%;
-  background: #0f0f0f;
-  color: #e5e5e5;
+  background: #0d0d0d;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue",
+    sans-serif;
 }
 
-/* ================= ROOT ================= */
-.nova-root {
+/* APP */
+.app {
   display: flex;
   flex-direction: column;
   height: 100vh;
 }
 
-/* ================= HEADER ================= */
-.nova-header {
+/* HEADER */
+header {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
-  padding: 14px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: #0f0f0f;
-}
-
-.nova-title {
+  padding: 14px 18px;
   font-weight: 600;
-  letter-spacing: 0.2px;
   font-size: 15px;
-  color: #f5f5f5;
+  border-bottom: 1px solid #1e1e1e;
 }
 
-/* ================= MAIN ================= */
-.nova-main {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.nova-messages {
-  width: 100%;
-  max-width: 760px;
-  padding: 24px 18px;
-  overflow-y: auto;
-  scroll-behavior: smooth;
-}
-
-/* ================= EMPTY ================= */
-.nova-empty {
-  margin-top: 18vh;
-  text-align: center;
-  animation: fadeIn 0.6s ease;
-}
-
-.nova-logo-big {
+header span {
   opacity: 0.85;
-  margin-bottom: 22px;
 }
 
-.nova-empty h1 {
-  font-size: 28px;
-  font-weight: 600;
-  margin-bottom: 10px;
-}
-
-.nova-sub {
-  color: #9ca3af;
-  font-size: 14px;
-}
-
-/* ================= MESSAGES ================= */
-.nova-message {
+/* MAIN */
+main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 16px;
   display: flex;
-  margin-bottom: 18px;
-  animation: slideUp 0.25s ease;
+  flex-direction: column;
+  gap: 24px;
+  animation: fadeIn 0.4s ease;
 }
 
-.nova-message.user {
+main.empty {
+  justify-content: center;
+  align-items: center;
+}
+
+.welcome {
+  font-size: 32px;
+  font-weight: 600;
+  opacity: 0.9;
+  animation: fadeUp 0.6s ease;
+}
+
+/* MESSAGES */
+.msg {
+  display: flex;
+}
+
+.msg.user {
   justify-content: flex-end;
 }
 
-.nova-message.assistant {
+.msg.assistant {
   justify-content: flex-start;
 }
 
-.nova-bubble {
-  max-width: 92%;
-  padding: 14px 16px;
+.bubble {
+  max-width: 680px;
+  padding: 14px 18px;
   border-radius: 14px;
-  font-size: 15px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  transition: background 0.2s ease;
+  line-height: 1.55;
+  animation: messagePop 0.3s ease;
 }
 
-/* user */
-.nova-message.user .nova-bubble {
+.msg.user .bubble {
+  background: #ffffff;
+  color: #000000;
+  border-bottom-right-radius: 4px;
+}
+
+.msg.assistant .bubble {
   background: #1a1a1a;
-  color: #f0f0f0;
-  border-bottom-right-radius: 6px;
+  color: #ffffff;
+  border-bottom-left-radius: 4px;
 }
 
-/* assistant */
-.nova-message.assistant .nova-bubble {
-  background: #121212;
-  color: #e2e2e2;
-  border-bottom-left-radius: 6px;
+/* TYPING */
+.typing {
+  font-style: italic;
+  opacity: 0.6;
+  animation: pulse 1.4s infinite;
 }
 
-/* ================= TYPING ================= */
-.nova-bubble.typing {
+/* MARKDOWN */
+.bubble strong {
+  font-weight: 700;
+}
+
+.bubble em {
+  opacity: 0.9;
+}
+
+.bubble code {
+  background: #000000;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  font-family: monospace;
+}
+
+.bubble pre {
+  background: #000000;
+  padding: 14px;
+  border-radius: 12px;
+  overflow-x: auto;
+  margin: 12px 0;
+  font-size: 0.9em;
+}
+
+/* FOOTER */
+footer {
   display: flex;
-  gap: 6px;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 16px;
+  border-top: 1px solid #1e1e1e;
+  background: #0d0d0d;
+  transition: all 0.3s ease;
 }
 
-.nova-bubble.typing span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #9ca3af;
-  animation: blink 1.4s infinite both;
+footer.centered {
+  max-width: 720px;
+  margin: 0 auto 24px;
+  border: 1px solid #1e1e1e;
+  border-radius: 16px;
 }
 
-.nova-bubble.typing span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.nova-bubble.typing span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-/* ================= INPUT ================= */
-.nova-input-area {
-  padding: 20px;
-  display: flex;
-  justify-content: center;
-  background: linear-gradient(
-    to top,
-    rgba(15, 15, 15, 0.95),
-    rgba(15, 15, 15, 0.7),
-    rgba(15, 15, 15, 0)
-  );
-}
-
-.nova-input-wrapper {
-  width: 100%;
-  max-width: 760px;
-  position: relative;
-}
-
-.nova-input-wrapper textarea {
-  width: 100%;
+/* INPUT */
+textarea {
+  flex: 1;
   resize: none;
-  padding: 14px 46px 14px 16px;
-  background: #121212;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  color: #f5f5f5;
-  font-size: 15px;
-  line-height: 1.6;
-  outline: none;
-  transition: border 0.2s ease, background 0.2s ease;
-}
-
-.nova-input-wrapper textarea::placeholder {
-  color: #6b7280;
-}
-
-.nova-input-wrapper textarea:focus {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: #141414;
-}
-
-/* send button */
-.nova-send {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  background: transparent;
+  color: white;
   border: none;
-  background: #22c55e;
-  color: #0f0f0f;
-  font-size: 18px;
+  outline: none;
+  font-size: 15px;
+  line-height: 1.5;
+  max-height: 200px;
+}
+
+textarea::placeholder {
+  color: #777;
+}
+
+/* BUTTONS */
+button {
+  background: #ffffff;
+  color: #000000;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 16px;
   transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
-.nova-send:hover {
-  transform: scale(1.05);
+button:hover {
+  transform: scale(1.06);
 }
 
-.nova-send:disabled {
+button:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-/* ================= ANIMS ================= */
-@keyframes blink {
-  0%,
-  80%,
-  100% {
-    opacity: 0.2;
-  }
-  40% {
-    opacity: 1;
-  }
+/* UPLOAD */
+.upload {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #2a2a2a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 20px;
+  opacity: 0.8;
+  transition: transform 0.15s ease;
 }
 
-@keyframes slideUp {
-  from {
-    transform: translateY(4px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+.upload:hover {
+  transform: scale(1.08);
 }
 
+/* ANIMATIONS */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0 }
+  to { opacity: 1 }
 }
 
-/* ================= MOBILE ================= */
-@media (max-width: 640px) {
-  .nova-empty h1 {
-    font-size: 22px;
-  }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px) }
+  to { opacity: 1; transform: translateY(0) }
+}
 
-  .nova-messages {
-    padding: 16px 12px;
-  }
+@keyframes messagePop {
+  from { opacity: 0; transform: scale(0.96) }
+  to { opacity: 1; transform: scale(1) }
+}
 
-  .nova-input-area {
-    padding: 14px;
-  }
+@keyframes pulse {
+  0%,100% { opacity: 0.4 }
+  50% { opacity: 0.8 }
 }
