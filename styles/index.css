@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* ZeroGPT Dark Theme Palette */
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+
+  --card: 240 10% 3.9%;
+  --card-foreground: 0 0% 98%;
+
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+
+  --primary: 0 0% 98%;
+  --primary-foreground: 240 5.9% 10%;
+
+  --secondary: 240 3.7% 15.9%;
+  --secondary-foreground: 0 0% 98%;
+
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+
+  --accent: 240 3.7% 15.9%;
+  --accent-foreground: 0 0% 98%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 240 3.7% 15.9%;
+  --input: 240 3.7% 15.9%;
+  --ring: 240 4.9% 83.9%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  
+  /* Custom Scrollbar for chat area */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent; 
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-zinc-800 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-zinc-700;
+  }
+
+  /* Markdown Styles */
+  .prose {
+    @apply text-foreground leading-relaxed;
+  }
+  .prose p {
+    @apply mb-4 last:mb-0;
+  }
+  .prose pre {
+    @apply bg-black/50 p-4 rounded-lg overflow-x-auto my-4 border border-border/50 font-mono text-sm;
+  }
+  .prose code {
+    @apply bg-secondary/50 px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+  .prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .prose ul {
+    @apply list-disc list-outside ml-4 mb-4 space-y-2;
+  }
+  .prose ol {
+    @apply list-decimal list-outside ml-4 mb-4 space-y-2;
+  }
+  .prose h1, .prose h2, .prose h3 {
+    @apply font-semibold mt-6 mb-3 text-primary;
+  }
+  .prose a {
+    @apply text-blue-400 hover:underline underline-offset-4;
+  }
+  .prose blockquote {
+    @apply border-l-2 border-zinc-700 pl-4 italic text-muted-foreground;
+  }
+}
