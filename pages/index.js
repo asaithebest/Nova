@@ -1,7 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Head from "next/head";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
@@ -11,26 +9,42 @@ export default function Home() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, loading]);
+
+  function formatText(text) {
+    let html = text
+      .replace(/```([\s\S]*?)```/g, (_, c) =>
+        `<pre><code>${c.replace(/</g, "&lt;")}</code><button class="copy">Copy</button></pre>`
+      )
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/\n/g, "<br/>");
+
+    return html;
+  }
 
   async function sendMessage(e) {
-    e.preventDefault();
+    e?.preventDefault();
     if (!input.trim()) return;
 
-    const newMessages = [...messages, { role: "user", content: input }];
-    setMessages(newMessages);
+    const userMsg = { role: "user", content: input };
+    setMessages((m) => [...m, userMsg]);
     setInput("");
     setLoading(true);
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: newMessages })
-    });
-
-    const data = await res.json();
-    setMessages([...newMessages, { role: "assistant", content: data.reply }]);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [...messages, userMsg] })
+      });
+      const data = await res.json();
+      setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
+    } catch {
+      setMessages((m) => [...m, { role: "assistant", content: "Error." }]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -39,228 +53,179 @@ export default function Home() {
         <title>NovaGPT</title>
       </Head>
 
-      <main className="container">
-        <header className="topbar">
-          <span className="logo">NOVAGPT</span>
-        </header>
-
-        <section className="chat">
-          {messages.length === 0 && (
-            <div className="empty">
-              <h1>How can I help you today?</h1>
-            </div>
-          )}
-
-          {messages.map((m, i) => (
-            <div key={i} className={`bubble ${m.role}`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {m.content}
-              </ReactMarkdown>
-            </div>
-          ))}
-
-          {loading && (
-            <div className="bubble assistant">Typing…</div>
-          )}
-          <div ref={bottomRef} />
-        </section>
-
-        <form className="input-zone" onSubmit={sendMessage}>
-          <div className="input-pill">
-            <button type="button" className="icon">+</button>
-
-            <input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder="ASK NOVAGPT"
-            />
-
-            <button type="button" className="icon">🎤</button>
-
-            <button className="send" disabled={!input.trim()}>
-              ↑
-            </button>
-          </div>
-        </form>
-      </main>
-
-      <style jsx>{`
-        * {
-          box-sizing: border-box;
-        }
-
+      <style>{`
+        * { box-sizing: border-box }
         body {
-          background: #1e1e1e;
-        }
-
-        .container {
-          height: 100vh;
-          display: flex;
-          flex-direction: column;
+          margin: 0;
+          background: #0f0f0f;
           color: white;
           font-family: system-ui, -apple-system, BlinkMacSystemFont;
         }
 
         .topbar {
-          padding: 14px 24px;
-          border-bottom: 1px solid #2a2a2a;
-        }
-
-        .logo {
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          font-size: 13px;
-        }
-
-        .chat {
-          flex: 1;
-          overflow-y: auto;
-          padding: 32px 20px 120px;
+          position: fixed;
+          top: 0;
+          left: 0;
+          height: 60px;
+          width: 100%;
           display: flex;
-          flex-direction: column;
           align-items: center;
+          padding: 0 16px;
+          background: #0f0f0f;
+          border-bottom: 1px solid #222;
+          z-index: 10;
+        }
+
+        .brand {
+          font-weight: 700;
+          font-size: 15px;
+          opacity: .9;
+        }
+
+        .container {
+          max-width: 780px;
+          margin: auto;
+          padding: 100px 16px 120px;
         }
 
         .empty {
-          margin-top: 25vh;
           text-align: center;
-          opacity: 0;
-          animation: fade 0.6s ease forwards;
+          margin-top: 20vh;
+          animation: fade .6s ease;
         }
 
         .empty h1 {
-          font-weight: 500;
-          color: #e5e5e5;
-        }
-
-        .bubble {
-          max-width: 720px;
-          width: 100%;
-          padding: 14px 18px;
-          margin-bottom: 18px;
-          line-height: 1.6;
-          font-size: 15px;
-          animation: fadeUp 0.3s ease;
-        }
-
-        .bubble.user {
-          background: #2b2b2b;
-          border-radius: 14px;
-        }
-
-        .bubble.assistant {
-          background: transparent;
-        }
-
-        .bubble pre {
-          background: #111;
-          padding: 14px;
-          border-radius: 10px;
-          overflow-x: auto;
-        }
-
-        .bubble code {
-          background: #111;
-          padding: 2px 6px;
-          border-radius: 6px;
-          font-family: monospace;
-        }
-
-        .bubble strong {
+          font-size: 28px;
           font-weight: 600;
         }
 
-        .bubble ul {
-          padding-left: 20px;
+        .message {
+          margin: 24px 0;
+          line-height: 1.6;
+          animation: slide .4s ease;
         }
 
-        .bubble li {
-          margin-bottom: 6px;
+        .user { opacity: .9 }
+        .assistant { opacity: .95 }
+
+        pre {
+          background: #111;
+          padding: 14px;
+          border-radius: 10px;
+          position: relative;
+          overflow-x: auto;
+          margin-top: 10px;
         }
 
-        .input-zone {
-          position: fixed;
-          bottom: 24px;
-          width: 100%;
-          display: flex;
-          justify-content: center;
-          pointer-events: none;
-        }
-
-        .input-pill {
-          pointer-events: all;
-          display: flex;
-          align-items: center;
-          background: #2b2b2b;
-          border-radius: 999px;
-          padding: 8px 14px;
-          width: 560px;
-          max-width: calc(100vw - 32px);
-          gap: 10px;
-          box-shadow: inset 0 0 0 1px #333;
-        }
-
-        .input-pill input {
-          flex: 1;
-          background: none;
-          border: none;
-          outline: none;
+        pre code {
           color: white;
-          font-size: 13px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
+          font-family: monospace;
         }
 
-        .icon {
-          width: 28px;
-          height: 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
+        .copy {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          background: #222;
           border: none;
-          background: transparent;
-          color: #aaa;
+          color: white;
+          padding: 4px 8px;
+          border-radius: 6px;
           cursor: pointer;
         }
 
-        .icon:hover {
-          background: #3a3a3a;
+        .inputBar {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          background: #0f0f0f;
+          padding: 16px;
+          border-top: 1px solid #222;
+        }
+
+        .inputWrap {
+          width: 100%;
+          max-width: 760px;
+          display: flex;
+          align-items: center;
+          background: #1c1c1c;
+          border-radius: 999px;
+          padding: 8px 12px;
+        }
+
+        .plus {
+          font-size: 18px;
+          margin-right: 8px;
+          opacity: .8;
+          cursor: pointer;
+        }
+
+        input {
+          flex: 1;
+          background: none;
+          border: none;
           color: white;
+          outline: none;
+          font-size: 15px;
         }
 
         .send {
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          border: none;
           background: white;
+          border-radius: 50%;
+          width: 34px;
+          height: 34px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           color: black;
           cursor: pointer;
         }
 
-        .send:disabled {
-          opacity: 0.3;
-          cursor: default;
-        }
-
-        @keyframes fadeUp {
-          from {
-            opacity: 0;
-            transform: translateY(6px);
-          }
-          to {
-            opacity: 1;
-            transform: none;
-          }
-        }
-
         @keyframes fade {
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0 }
+          to { opacity: 1 }
+        }
+
+        @keyframes slide {
+          from { transform: translateY(8px); opacity: 0 }
+          to { transform: translateY(0); opacity: 1 }
         }
       `}</style>
+
+      <div className="topbar">
+        <div className="brand">NovaGPT</div>
+      </div>
+
+      <div className="container">
+        {messages.length === 0 && !loading ? (
+          <div className="empty">
+            <h1>How can I help you today?</h1>
+          </div>
+        ) : (
+          messages.map((m, i) => (
+            <div key={i} className={`message ${m.role}`}>
+              <div dangerouslySetInnerHTML={{ __html: formatText(m.content) }} />
+            </div>
+          ))
+        )}
+        {loading && <div className="message assistant">Thinking…</div>}
+        <div ref={bottomRef} />
+      </div>
+
+      <form className="inputBar" onSubmit={sendMessage}>
+        <div className="inputWrap">
+          <div className="plus">+</div>
+          <input
+            placeholder="Ask NovaGPT…"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+          />
+          <div className="send" onClick={sendMessage}>➤</div>
+        </div>
+      </form>
     </>
   );
 }
