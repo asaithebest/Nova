@@ -18,8 +18,8 @@ export default async function handler(req, res) {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
         model: "gpt-4o",
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
           {
             role: "system",
             content:
-              "Tu es ZeroGPT, un assistant clair, direct et utile. Tu peux être détendu mais tu fais exactement ce que l'utilisateur demande."
+              "Tu es ZeroGPT, un assistant clair, drôle quand il faut, et très utile."
           },
           ...messages.slice(-10)
         ],
