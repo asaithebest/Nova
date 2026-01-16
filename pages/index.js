@@ -7,6 +7,7 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -18,12 +19,12 @@ export default function Home() {
     e?.preventDefault();
     if ((!input.trim() && !file) || loading) return;
 
-    const userMessage = {
+    const userMsg = {
       role: "user",
-      content: input || (file ? `Uploaded file: ${file.name}` : ""),
+      content: input || (file ? `File uploaded: ${file.name}` : ""),
     };
 
-    const newMessages = [...messages, userMessage];
+    const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
     setFile(null);
@@ -38,7 +39,6 @@ export default function Home() {
         method: "POST",
         body: formData,
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || "API error");
 
@@ -62,7 +62,7 @@ export default function Home() {
         <title>NovaGPT</title>
       </Head>
 
-      {/* TOP LEFT BRAND */}
+      {/* BRAND */}
       <div className="top-left">
         <Image src="/logo.png" alt="NovaGPT" width={26} height={26} />
         <span>NovaGPT</span>
@@ -71,24 +71,29 @@ export default function Home() {
       <div className="page">
         <main className={`chat ${messages.length === 0 ? "centered" : ""}`}>
           {messages.length === 0 && (
-            <h1 className="title">How can I help you today?</h1>
+            <h1 className="title fade-in">How can I help you today?</h1>
           )}
 
           {messages.map((m, i) => (
-            <div key={i} className={`message ${m.role}`}>
+            <div key={i} className={`message ${m.role} slide-in`}>
               <div className="bubble">{m.content}</div>
             </div>
           ))}
 
           {loading && (
-            <div className="message assistant">
-              <div className="bubble typing">Thinking…</div>
+            <div className="message assistant slide-in">
+              <div className="bubble typing">
+                <span className="dot"></span>
+                <span className="dot"></span>
+                <span className="dot"></span>
+              </div>
             </div>
           )}
+
           <div ref={bottomRef} />
         </main>
 
-        {/* INPUT BAR (CENTERED LIKE CHATGPT) */}
+        {/* INPUT */}
         <form className="composer" onSubmit={sendMessage}>
           <input
             type="file"
@@ -122,6 +127,7 @@ export default function Home() {
         </form>
       </div>
 
+      {/* STYLES */}
       <style jsx>{`
         body {
           margin: 0;
@@ -186,10 +192,7 @@ export default function Home() {
           white-space: pre-wrap;
         }
 
-        .typing {
-          opacity: 0.6;
-          font-style: italic;
-        }
+        /* --- INPUT --- */
 
         .composer {
           position: sticky;
@@ -197,19 +200,12 @@ export default function Home() {
           width: 100%;
           display: flex;
           justify-content: center;
+          gap: 8px;
           padding: 24px 16px 32px;
           background: linear-gradient(
             transparent,
             rgba(0, 0, 0, 0.85) 40%
           );
-        }
-
-        .composer > * {
-          max-width: 760px;
-        }
-
-        .composer {
-          gap: 8px;
         }
 
         .icon-btn {
@@ -219,6 +215,11 @@ export default function Home() {
           border-radius: 10px;
           padding: 0 12px;
           cursor: pointer;
+          transition: background 0.2s;
+        }
+
+        .icon-btn:hover {
+          background: #151515;
         }
 
         .text-input {
@@ -229,6 +230,11 @@ export default function Home() {
           border-radius: 12px;
           color: #fff;
           outline: none;
+          transition: border 0.2s;
+        }
+
+        .text-input:focus {
+          border-color: #444;
         }
 
         .send-btn {
@@ -238,10 +244,81 @@ export default function Home() {
           padding: 0 16px;
           border: none;
           cursor: pointer;
+          transition: transform 0.1s ease, opacity 0.2s;
+        }
+
+        .send-btn:active {
+          transform: scale(0.95);
         }
 
         .send-btn:disabled {
           opacity: 0.3;
+        }
+
+        /* --- ANIMATIONS --- */
+
+        .fade-in {
+          animation: fade 0.6s ease;
+        }
+
+        .slide-in {
+          animation: slide 0.25s ease;
+        }
+
+        @keyframes fade {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes slide {
+          from {
+            opacity: 0;
+            transform: translateY(6px);
+          }
+          to {
+            opacity: 1;
+            transform: none;
+          }
+        }
+
+        /* TYPING DOTS */
+
+        .typing {
+          display: flex;
+          gap: 6px;
+        }
+
+        .dot {
+          width: 6px;
+          height: 6px;
+          background: #fff;
+          border-radius: 50%;
+          opacity: 0.3;
+          animation: blink 1.4s infinite both;
+        }
+
+        .dot:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+
+        .dot:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+
+        @keyframes blink {
+          0% {
+            opacity: 0.3;
+          }
+          50% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0.3;
+          }
         }
       `}</style>
     </>
