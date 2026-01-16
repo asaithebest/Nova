@@ -1,47 +1,53 @@
-import { useEffect, useRef, useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Head from "next/head";
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
-
-  function formatText(text) {
-    let html = text
-      .replace(/```([\s\S]*?)```/g, (_, c) =>
-        `<pre><code>${c.replace(/</g, "&lt;")}</code><button class="copy">Copy</button></pre>`
-      )
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/\n/g, "<br/>");
-
-    return html;
-  }
+  }, [messages]);
 
   async function sendMessage(e) {
     e?.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() && !file) return;
 
-    const userMsg = { role: "user", content: input };
-    setMessages((m) => [...m, userMsg]);
+    const userMessage = {
+      role: "user",
+      content: input || file.name,
+    };
+
+    setMessages((m) => [...m, userMessage]);
     setInput("");
     setLoading(true);
+
+    const formData = new FormData();
+    formData.append("message", input);
+    if (file) formData.append("file", file);
+
+    setFile(null);
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [...messages, userMsg] })
+        body: formData,
       });
+
       const data = await res.json();
-      setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
+
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: data.reply || "No response." },
+      ]);
     } catch {
-      setMessages((m) => [...m, { role: "assistant", content: "Error." }]);
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: "Server error." },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -51,181 +57,179 @@ export default function Home() {
     <>
       <Head>
         <title>NovaGPT</title>
+        <link rel="icon" href="/logo.png" />
       </Head>
 
-      <style>{`
-        * { box-sizing: border-box }
-        body {
-          margin: 0;
-          background: #0f0f0f;
-          color: white;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont;
-        }
-
-        .topbar {
-          position: fixed;
-          top: 0;
-          left: 0;
-          height: 60px;
-          width: 100%;
-          display: flex;
-          align-items: center;
-          padding: 0 16px;
-          background: #0f0f0f;
-          border-bottom: 1px solid #222;
-          z-index: 10;
-        }
-
-        .brand {
-          font-weight: 700;
-          font-size: 15px;
-          opacity: .9;
-        }
-
-        .container {
-          max-width: 780px;
-          margin: auto;
-          padding: 100px 16px 120px;
-        }
-
-        .empty {
-          text-align: center;
-          margin-top: 20vh;
-          animation: fade .6s ease;
-        }
-
-        .empty h1 {
-          font-size: 28px;
-          font-weight: 600;
-        }
-
-        .message {
-          margin: 24px 0;
-          line-height: 1.6;
-          animation: slide .4s ease;
-        }
-
-        .user { opacity: .9 }
-        .assistant { opacity: .95 }
-
-        pre {
-          background: #111;
-          padding: 14px;
-          border-radius: 10px;
-          position: relative;
-          overflow-x: auto;
-          margin-top: 10px;
-        }
-
-        pre code {
-          color: white;
-          font-family: monospace;
-        }
-
-        .copy {
-          position: absolute;
-          top: 8px;
-          right: 8px;
-          background: #222;
-          border: none;
-          color: white;
-          padding: 4px 8px;
-          border-radius: 6px;
-          cursor: pointer;
-        }
-
-        .inputBar {
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          width: 100%;
-          display: flex;
-          justify-content: center;
-          background: #0f0f0f;
-          padding: 16px;
-          border-top: 1px solid #222;
-        }
-
-        .inputWrap {
-          width: 100%;
-          max-width: 760px;
-          display: flex;
-          align-items: center;
-          background: #1c1c1c;
-          border-radius: 999px;
-          padding: 8px 12px;
-        }
-
-        .plus {
-          font-size: 18px;
-          margin-right: 8px;
-          opacity: .8;
-          cursor: pointer;
-        }
-
-        input {
-          flex: 1;
-          background: none;
-          border: none;
-          color: white;
-          outline: none;
-          font-size: 15px;
-        }
-
-        .send {
-          background: white;
-          border-radius: 50%;
-          width: 34px;
-          height: 34px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: black;
-          cursor: pointer;
-        }
-
-        @keyframes fade {
-          from { opacity: 0 }
-          to { opacity: 1 }
-        }
-
-        @keyframes slide {
-          from { transform: translateY(8px); opacity: 0 }
-          to { transform: translateY(0); opacity: 1 }
-        }
-      `}</style>
-
-      <div className="topbar">
-        <div className="brand">NovaGPT</div>
-      </div>
-
-      <div className="container">
-        {messages.length === 0 && !loading ? (
-          <div className="empty">
-            <h1>How can I help you today?</h1>
-          </div>
-        ) : (
-          messages.map((m, i) => (
-            <div key={i} className={`message ${m.role}`}>
-              <div dangerouslySetInnerHTML={{ __html: formatText(m.content) }} />
+      <main className="app">
+        <div className="chat">
+          {messages.length === 0 && (
+            <div className="empty">
+              <h1>NovaGPT</h1>
+              <p>Ask anything. Upload files. Analyze images & PDFs.</p>
             </div>
-          ))
-        )}
-        {loading && <div className="message assistant">Thinking…</div>}
-        <div ref={bottomRef} />
-      </div>
+          )}
 
-      <form className="inputBar" onSubmit={sendMessage}>
-        <div className="inputWrap">
-          <div className="plus">+</div>
+          {messages.map((m, i) => (
+            <div key={i} className={`msg ${m.role}`}>
+              <div className="bubble">{m.content}</div>
+            </div>
+          ))}
+
+          {loading && (
+            <div className="msg assistant">
+              <div className="bubble typing">Thinking…</div>
+            </div>
+          )}
+
+          <div ref={bottomRef} />
+        </div>
+            />
+          </label>
+
           <input
-            placeholder="Ask NovaGPT…"
+            placeholder="Message NovaGPT"
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
-          <div className="send" onClick={sendMessage}>➤</div>
-        </div>
-      </form>
+
+          <button type="submit">➤</button>
+        </form>
+      </main>
+
+      <style jsx>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        body {
+          margin: 0;
+          font-family: system-ui, sans-serif;
+          background: #0f0f0f;
+          color: white;
+        }
+
+        .app {
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
+        .chat {
+          flex: 1;
+          width: 100%;
+          max-width: 720px;
+          padding: 40px 20px;
+          overflow-y: auto;
+        }
+
+        .empty {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          opacity: 0;
+          animation: fadeIn 0.6s forwards;
+        }
+
+        .empty h1 {
+          font-size: 42px;
+          margin-bottom: 8px;
+        }
+
+        .empty p {
+          opacity: 0.6;
+        }
+
+        .msg {
+          display: flex;
+          margin-bottom: 16px;
+          animation: slideUp 0.25s ease;
+        }
+
+        .msg.user {
+          justify-content: flex-end;
+        }
+
+        .bubble {
+          max-width: 85%;
+          padding: 14px 16px;
+          border-radius: 14px;
+          line-height: 1.45;
+          background: #1f1f1f;
+        }
+
+        .msg.user .bubble {
+          background: #2d2d2d;
+        }
+
+        .typing {
+          opacity: 0.6;
+          font-style: italic;
+        }
+
+        .inputBar {
+          width: 100%;
+          max-width: 720px;
+          display: flex;
+          align-items: center;
+          padding: 12px;
+          border-top: 1px solid #222;
+          background: #0f0f0f;
+        }
+
+        .upload {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          border: 1px solid #333;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          margin-right: 10px;
+        }
+
+        .inputBar input {
+          flex: 1;
+          background: #1a1a1a;
+          border: none;
+          color: white;
+          padding: 12px;
+          border-radius: 20px;
+          outline: none;
+        }
+
+        .inputBar button {
+          margin-left: 10px;
+          background: white;
+          color: black;
+          border: none;
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 16px;
+        }
+
+        @keyframes fadeIn {
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(6px);
+          }
+          to {
+            opacity: 1;
+            transform: none;
+          }
+        }
+      `}</style>
     </>
   );
 }
