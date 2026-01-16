@@ -1,83 +1,166 @@
+// pages/index.js
 import { useEffect, useRef, useState } from "react";
 import Head from "next/head";
 
 export default function Home() {
+  const [isAuth, setIsAuth] = useState(false);
   const [user, setUser] = useState(null);
-  const [chats, setChats] = useState([]);
-  const [activeId, setActiveId] = useState(null);
-  const [input, setInput] = useState("");
-  const bottomRef = useRef(null);
 
+  const [convs, setConvs] = useState([]);
+  const [currentId, setCurrentId] = useState(null);
+  const [messages, setMessages] = useState([]);
+
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const msgRef = useRef(null);
+  const taRef = useRef(null);
+
+  /* -------------------- AUTH -------------------- */
   useEffect(() => {
-    const u = localStorage.getItem("zero_user");
-    if (u) {
+    const session = localStorage.getItem("zero_session");
+    if (session) {
+      const u = JSON.parse(session);
       setUser(u);
-      const saved = JSON.parse(localStorage.getItem(`zero_chats_${u}`) || "[]");
-      setChats(saved);
-      if (saved[0]) setActiveId(saved[0].id);
+      setIsAuth(true);
+      const saved = localStorage.getItem(`zero_convs_${u.username}`);
+      if (saved) {
+        const c = JSON.parse(saved);
+        setConvs(c);
+        if (c[0]) {
+          setCurrentId(c[0].id);
+          setMessages(c[0].messages);
+        }
+      }
     }
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(`zero_chats_${user}`, JSON.stringify(chats));
-    }
-  }, [chats, user]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chats, activeId]);
-
-  function login(name) {
-    localStorage.setItem("zero_user", name);
-    setUser(name);
-    setChats([]);
+  function login() {
+    const username = prompt("Username");
+    if (!username) return;
+    const u = { username };
+    localStorage.setItem("zero_session", JSON.stringify(u));
+    setUser(u);
+    setIsAuth(true);
   }
 
   function logout() {
-    localStorage.clear();
+    localStorage.removeItem("zero_session");
+    setIsAuth(false);
     setUser(null);
-    setChats([]);
+    setConvs([]);
+    setMessages([]);
+    setCurrentId(null);
   }
+
+  /* -------------------- CHAT -------------------- */
+  useEffect(() => {
+    msgRef.current?.scrollTo({
+      top: msgRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages, loading]);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(
+        `zero_convs_${user.username}`,
+        JSON.stringify(convs)
+      );
+    }
+  }, [convs, user]);
 
   function newChat() {
-    const chat = {
+    const c = {
       id: Date.now().toString(),
       title: "New chat",
-      messages: []
+      messages: [],
     };
-    setChats([chat, ...chats]);
-    setActiveId(chat.id);
+    setConvs([c, ...convs]);
+    setCurrentId(c.id);
+    setMessages([]);
   }
 
-  function send() {
-    if (!input.trim()) return;
-    setChats(prev =>
-      prev.map(c =>
-        c.id === activeId
+  function switchChat(id) {
+    const c = convs.find((x) => x.id === id);
+    if (!c) return;
+    setCurrentId(id);
+    setMessages(c.messages);
+  }
+
+  function updateConv(msgs) {
+    setConvs((prev) =>
+      prev.map((c) =>
+        c.id === currentId
           ? {
               ...c,
-              title: c.messages.length === 0 ? input.slice(0, 30) : c.title,
-              messages: [...c.messages, { role: "user", content: input }]
+              messages: msgs,
+              title:
+                c.title === "New chat" && msgs[0]
+                  ? msgs[0].content.slice(0, 32) + "…"
+                  : c.title,
             }
           : c
       )
     );
-    setInput("");
   }
 
-  const current = chats.find(c => c.id === activeId);
+  async function send(e) {
+    e?.preventDefault();
+    if (!input.trim() || loading) return;
 
-  if (!user) {
+    if (!currentId) newChat();
+
+    const next = [...messages, { role: "user", content: input }];
+    setMessages(next);
+    updateConv(next);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const r = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: next }),
+      });
+      const d = await r.json();
+      const reply =
+        d?.reply ||
+        d?.choices?.[0]?.message?.content ||
+        "No response.";
+      const final = [...next, { role: "assistant", content: reply }];
+      setMessages(final);
+      updateConv(final);
+    } catch (err) {
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: "Network error." },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* -------------------- UI -------------------- */
+  if (!isAuth) {
     return (
-      <div className="login">
-        <h1>ZeroGPT</h1>
-        <input
-          placeholder="Username"
-          onKeyDown={e => e.key === "Enter" && login(e.target.value)}
-        />
-        <p>Press Enter to continue</p>
-      </div>
+      <>
+        <Head>
+          <title>ZeroGPT</title>
+        </Head>
+        <div className="center" style={{ height: "100vh" }}>
+          <div style={{ textAlign: "center" }}>
+            <div className="logo-round" style={{ margin: "0 auto 20px" }}>
+              Z
+            </div>
+            <h1>ZeroGPT</h1>
+            <p className="kv">AI Assistant</p>
+            <button className="send-btn" onClick={login}>
+              Login
+            </button>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -88,44 +171,90 @@ export default function Home() {
       </Head>
 
       <div className="app">
-        <aside className="sidebar">
-          <button className="new" onClick={newChat}>＋ New chat</button>
+        {/* SIDEBAR */}
+        <aside>
+          <button className="new" onClick={newChat}>
+            + New chat
+          </button>
 
-          <div className="list">
-            {chats.map(c => (
+          <div className="sidebar-list">
+            {convs.map((c) => (
               <div
                 key={c.id}
-                className={`chat-item ${c.id === activeId ? "active" : ""}`}
-                onClick={() => setActiveId(c.id)}
+                className={`conv-item ${c.id === currentId ? "active" : ""}`}
+                onClick={() => switchChat(c.id)}
               >
-                {c.title}
+                <div className="title">{c.title}</div>
               </div>
             ))}
           </div>
 
-          <button className="logout" onClick={logout}>Log out</button>
+          <div className="sidebar-footer">
+            <div className="user-avatar">
+              {user.username[0].toUpperCase()}
+            </div>
+            <button className="kv" onClick={logout}>
+              Logout
+            </button>
+          </div>
         </aside>
 
-        <main className="chat">
-          <div className="messages">
-            {current?.messages.map((m, i) => (
-              <div key={i} className={`msg ${m.role}`}>{m.content}</div>
-            ))}
-            <div ref={bottomRef} />
+        {/* MAIN */}
+        <main>
+          <div className="header">
+            <div className="brand">
+              <div className="logo-round">Z</div>
+              <strong>ZeroGPT</strong>
+            </div>
           </div>
 
-          <div className="input">
-            <textarea
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder="Message ZeroGPT…"
-              onKeyDown={e => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-            />
+          <div className="chat-container">
+            <div className="chat-column">
+              {messages.length === 0 ? (
+                <div className="center" style={{ flex: 1 }}>
+                  <h2>How can I help you today?</h2>
+                </div>
+              ) : (
+                <div className="messages" ref={msgRef}>
+                  {messages.map((m, i) => (
+                    <div key={i} className={`message ${m.role}`}>
+                      {m.content}
+                    </div>
+                  ))}
+                  {loading && (
+                    <div className="message assistant">
+                      <div className="typing">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <form className="input-area" onSubmit={send}>
+                <textarea
+                  ref={taRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Message ZeroGPT…"
+                  rows={1}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      send();
+                    }
+                  }}
+                />
+                <button
+                  className="send-btn"
+                  disabled={loading || !input.trim()}
+                >
+                  Send
+                </button>
+              </form>
+            </div>
           </div>
         </main>
       </div>
