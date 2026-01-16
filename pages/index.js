@@ -1,167 +1,192 @@
 import { useState, useRef, useEffect } from "react";
 import Head from "next/head";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, loading]);
 
   async function sendMessage(e) {
     e?.preventDefault();
-    if (!input.trim() && !file) return;
+    if (!input.trim() || loading) return;
 
-    const userMessage = {
-      role: "user",
-      content: input || file.name,
-    };
+    const userMsg = { role: "user", content: input };
+    const history = [...messages, userMsg];
 
-    setMessages((m) => [...m, userMessage]);
+    setMessages(history);
     setInput("");
     setLoading(true);
 
-    const formData = new FormData();
-    formData.append("message", input);
-    if (file) formData.append("file", file);
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: history })
+    });
 
-    setFile(null);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let assistantText = "";
 
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        body: formData,
+    setMessages((m) => [...m, { role: "assistant", content: "" }]);
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      assistantText += decoder.decode(value);
+
+      setMessages((msgs) => {
+        const copy = [...msgs];
+        copy[copy.length - 1] = {
+          role: "assistant",
+          content: assistantText
+        };
+        return copy;
       });
-
-      const data = await res.json();
-
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: data.reply || "No response." },
-      ]);
-    } catch {
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: "Server error." },
-      ]);
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
   }
 
   return (
     <>
       <Head>
         <title>NovaGPT</title>
-        <link rel="icon" href="/logo.png" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <main className="app">
-        <div className="chat">
-          {messages.length === 0 && (
-            <div className="empty">
-              <h1>NovaGPT</h1>
-              <p>Ask anything. Upload files. Analyze images & PDFs.</p>
-            </div>
-          )}
+      <div className="app">
+        <header>
+          <span>NovaGPT</span>
+        </header>
 
-          {messages.map((m, i) => (
-            <div key={i} className={`msg ${m.role}`}>
-              <div className="bubble">{m.content}</div>
-            </div>
-          ))}
+        <main className={messages.length === 0 ? "empty" : ""}>
+          {messages.length === 0 ? (
+            <div className="welcome">What can I help you with?</div>
+          ) : (
+            messages.map((m, i) => (
+              <div key={i} className={`msg ${m.role}`}>
+                <div className="bubble">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {m.content}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            ))
+          )}
 
           {loading && (
             <div className="msg assistant">
-              <div className="bubble typing">Thinking…</div>
+              <div className="bubble typing">NovaGPT is typing…</div>
             </div>
           )}
 
           <div ref={bottomRef} />
-        </div>
+        </main>
+
+        <footer className={messages.length === 0 ? "centered" : ""}>
+          <form onSubmit={sendMessage}>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Message NovaGPT…"
+              rows={1}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
             />
-          </label>
+            <button type="submit" disabled={loading}>➤</button>
+          </form>
+        </footer>
+      </div>
 
-          <input
-            placeholder="Message NovaGPT"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-          />
-
-          <button type="submit">➤</button>
-        </form>
-      </main>
-
-      <style jsx>{`
+      {/* ================= CSS GLOBAL ================= */}
+      <style jsx global>{`
         * {
           box-sizing: border-box;
+          margin: 0;
+          padding: 0;
         }
 
         body {
-          margin: 0;
-          font-family: system-ui, sans-serif;
-          background: #0f0f0f;
-          color: white;
+          background: #0d0d0d;
+          color: #ffffff;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+            Roboto, Helvetica, Arial, sans-serif;
         }
 
         .app {
+          display: flex;
+          flex-direction: column;
           height: 100vh;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
         }
 
-        .chat {
+        header {
+          padding: 14px 16px;
+          font-weight: 600;
+          border-bottom: 1px solid #1e1e1e;
+        }
+
+        main {
           flex: 1;
-          width: 100%;
-          max-width: 720px;
-          padding: 40px 20px;
           overflow-y: auto;
-        }
-
-        .empty {
-          height: 100%;
+          padding: 20px 12px;
           display: flex;
           flex-direction: column;
+          gap: 20px;
+        }
+
+        main.empty {
           justify-content: center;
           align-items: center;
-          opacity: 0;
-          animation: fadeIn 0.6s forwards;
         }
 
-        .empty h1 {
-          font-size: 42px;
-          margin-bottom: 8px;
-        }
-
-        .empty p {
-          opacity: 0.6;
+        .welcome {
+          font-size: 26px;
+          font-weight: 600;
+          text-align: center;
+          opacity: 0.9;
         }
 
         .msg {
           display: flex;
-          margin-bottom: 16px;
-          animation: slideUp 0.25s ease;
         }
 
         .msg.user {
           justify-content: flex-end;
         }
 
+        .msg.assistant {
+          justify-content: flex-start;
+        }
+
         .bubble {
-          max-width: 85%;
+          max-width: 680px;
+          width: 100%;
           padding: 14px 16px;
           border-radius: 14px;
-          line-height: 1.45;
-          background: #1f1f1f;
+          line-height: 1.55;
         }
 
         .msg.user .bubble {
-          background: #2d2d2d;
+          background: #ffffff;
+          color: #000000;
+          border-bottom-right-radius: 6px;
+        }
+
+        .msg.assistant .bubble {
+          background: #1a1a1a;
+          border-bottom-left-radius: 6px;
         }
 
         .typing {
@@ -169,64 +194,98 @@ export default function Home() {
           font-style: italic;
         }
 
-        .inputBar {
-          width: 100%;
+        /* MARKDOWN */
+        .bubble strong {
+          font-weight: 700;
+        }
+
+        .bubble em {
+          opacity: 0.9;
+        }
+
+        .bubble hr {
+          border: none;
+          border-top: 1px solid #444;
+          margin: 16px 0;
+        }
+
+        .bubble code {
+          background: #000;
+          padding: 3px 6px;
+          border-radius: 6px;
+          font-size: 0.9em;
+        }
+
+        .bubble pre {
+          background: #000;
+          padding: 12px;
+          border-radius: 12px;
+          overflow-x: auto;
+          margin: 12px 0;
+          font-size: 0.9em;
+        }
+
+        footer {
+          padding: 14px;
+          border-top: 1px solid #1e1e1e;
+        }
+
+        footer.centered {
           max-width: 720px;
-          display: flex;
-          align-items: center;
-          padding: 12px;
-          border-top: 1px solid #222;
-          background: #0f0f0f;
+          margin: 0 auto 20px;
+          border: 1px solid #1e1e1e;
+          border-radius: 16px;
         }
 
-        .upload {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          border: 1px solid #333;
+        footer form {
           display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          margin-right: 10px;
+          gap: 10px;
+          align-items: flex-end;
         }
 
-        .inputBar input {
+        textarea {
           flex: 1;
-          background: #1a1a1a;
+          resize: none;
           border: none;
-          color: white;
-          padding: 12px;
-          border-radius: 20px;
           outline: none;
+          background: transparent;
+          color: white;
+          font-size: 15px;
+          line-height: 1.4;
         }
 
-        .inputBar button {
-          margin-left: 10px;
-          background: white;
-          color: black;
+        textarea::placeholder {
+          color: #777;
+        }
+
+        button {
+          background: #ffffff;
+          color: #000000;
           border: none;
           width: 36px;
           height: 36px;
           border-radius: 50%;
-          cursor: pointer;
           font-size: 16px;
+          cursor: pointer;
         }
 
-        @keyframes fadeIn {
-          to {
-            opacity: 1;
-          }
+        button:disabled {
+          opacity: 0.4;
         }
 
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(6px);
+        /* 📱 MOBILE */
+        @media (max-width: 600px) {
+          .bubble {
+            max-width: 100%;
+            font-size: 14px;
           }
-          to {
-            opacity: 1;
-            transform: none;
+
+          .welcome {
+            font-size: 22px;
+          }
+
+          footer.centered {
+            margin: 0 10px 14px;
           }
         }
       `}</style>
