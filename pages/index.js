@@ -4,23 +4,25 @@ import Head from "next/head";
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+
   const textareaRef = useRef(null);
   const bottomRef = useRef(null);
 
-  // Auto scroll
+  // Scroll auto
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages]);
 
-  // Auto resize textarea
+  // Textarea auto-grow
   useEffect(() => {
     if (!textareaRef.current) return;
     textareaRef.current.style.height = "auto";
-    textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    textareaRef.current.style.height =
+      Math.min(textareaRef.current.scrollHeight, 220) + "px";
   }, [input]);
 
-  function formatText(text) {
+  function format(text) {
     return text
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
@@ -30,33 +32,44 @@ export default function Home() {
 
   async function sendMessage(e) {
     e.preventDefault();
-    if (!input.trim() || loading) return;
+    if (!input.trim() || streaming) return;
 
-    const newMessages = [...messages, { role: "user", content: input }];
-    setMessages(newMessages);
+    const userMsg = { role: "user", content: input };
+    const assistantMsg = { role: "assistant", content: "" };
+
+    setMessages((m) => [...m, userMsg, assistantMsg]);
     setInput("");
-    setLoading(true);
+    setStreaming(true);
 
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages })
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [...messages, userMsg] })
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    let done = false;
+    while (!done) {
+      const { value, done: doneReading } = await reader.read();
+      done = doneReading;
+
+      const chunk = decoder.decode(value || new Uint8Array(), {
+        stream: !done
       });
 
-      const data = await res.json();
-      setMessages([
-        ...newMessages,
-        { role: "assistant", content: data.reply || "No response." }
-      ]);
-    } catch {
-      setMessages([
-        ...newMessages,
-        { role: "assistant", content: "Error." }
-      ]);
-    } finally {
-      setLoading(false);
+      setMessages((prev) => {
+        const copy = [...prev];
+        copy[copy.length - 1] = {
+          role: "assistant",
+          content: copy[copy.length - 1].content + chunk
+        };
+        return copy;
+      });
     }
+
+    setStreaming(false);
   }
 
   return (
@@ -66,29 +79,28 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <div className="page">
-        <div className="chat">
-          {messages.length === 0 && !loading && (
-            <div className="welcome">
+      <main className="page">
+        <section className="chat">
+          {messages.length === 0 && (
+            <div className="center">
               <h1>How can I help you today?</h1>
             </div>
           )}
 
-          <div className="messages">
+          <div className="msgs">
             {messages.map((m, i) => (
-              <div key={i} className={`bubble ${m.role}`}>
+              <div key={i} className={`msg ${m.role}`}>
                 <div
                   dangerouslySetInnerHTML={{
-                    __html: formatText(m.content)
+                    __html: format(m.content)
                   }}
                 />
               </div>
             ))}
-            {loading && <div className="bubble assistant">Thinking…</div>}
             <div ref={bottomRef} />
           </div>
 
-          <form className="input-wrap" onSubmit={sendMessage}>
+          <form className="bar" onSubmit={sendMessage}>
             <textarea
               ref={textareaRef}
               value={input}
@@ -102,24 +114,17 @@ export default function Home() {
                 }
               }}
             />
-            <button type="submit" disabled={!input.trim()}>
-              ⬆
-            </button>
+            <button disabled={!input.trim() || streaming}>⮕</button>
           </form>
-        </div>
-      </div>
+        </section>
+      </main>
 
       <style jsx>{`
-        * {
-          box-sizing: border-box;
-        }
-
         body {
           margin: 0;
-          background: #0f0f0f;
-          color: #f5f5f5;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont,
-            "Segoe UI", sans-serif;
+          background: #0e0e0e;
+          color: #f2f2f2;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont;
         }
 
         .page {
@@ -134,45 +139,37 @@ export default function Home() {
           max-width: 780px;
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
         }
 
-        .welcome {
+        .center {
+          margin-top: 24vh;
           text-align: center;
-          margin-top: 22vh;
           opacity: 0;
-          animation: fadeIn 0.6s forwards;
+          animation: fade 0.5s forwards;
         }
 
-        .welcome h1 {
+        .center h1 {
+          font-weight: 500;
           font-size: 26px;
-          font-weight: 600;
-          color: #eaeaea;
         }
 
-        .messages {
+        .msgs {
           flex: 1;
+          padding-bottom: 140px;
           overflow-y: auto;
-          padding-bottom: 120px;
         }
 
-        .bubble {
-          max-width: 100%;
-          margin: 12px 0;
+        .msg {
+          margin: 16px 0;
           padding: 14px 16px;
           border-radius: 12px;
-          line-height: 1.6;
-          font-size: 15px;
-          animation: fadeUp 0.25s ease;
-        }
-
-        .bubble.user {
-          background: #1e1e1e;
-        }
-
-        .bubble.assistant {
           background: #151515;
-          border: 1px solid #222;
+          animation: up 0.2s ease;
+          line-height: 1.6;
+        }
+
+        .msg.user {
+          background: #1f1f1f;
         }
 
         strong {
@@ -190,17 +187,17 @@ export default function Home() {
           font-size: 13px;
         }
 
-        .input-wrap {
+        .bar {
           position: sticky;
-          bottom: 20px;
-          display: flex;
-          align-items: flex-end;
-          gap: 10px;
+          bottom: 18px;
           background: #121212;
           border-radius: 18px;
-          padding: 12px 14px;
           border: 1px solid #222;
-          backdrop-filter: blur(10px);
+          display: flex;
+          align-items: flex-end;
+          gap: 12px;
+          padding: 12px 14px;
+          backdrop-filter: blur(12px);
         }
 
         textarea {
@@ -212,31 +209,25 @@ export default function Home() {
           color: #fff;
           font-size: 15px;
           line-height: 1.6;
-          max-height: 200px;
+          max-height: 220px;
         }
 
         button {
-          background: #fff;
-          color: #000;
-          border: none;
           width: 36px;
           height: 36px;
           border-radius: 50%;
-          font-size: 18px;
+          border: none;
           cursor: pointer;
-          transition: transform 0.15s ease;
+          background: #fff;
+          color: #000;
+          font-size: 16px;
         }
 
         button:disabled {
           opacity: 0.3;
-          cursor: not-allowed;
         }
 
-        button:hover:not(:disabled) {
-          transform: scale(1.05);
-        }
-
-        @keyframes fadeUp {
+        @keyframes up {
           from {
             opacity: 0;
             transform: translateY(6px);
@@ -247,18 +238,14 @@ export default function Home() {
           }
         }
 
-        @keyframes fadeIn {
+        @keyframes fade {
           to {
             opacity: 1;
           }
         }
 
         @media (max-width: 600px) {
-          .chat {
-            padding-bottom: 10px;
-          }
-
-          .welcome h1 {
+          .center h1 {
             font-size: 22px;
           }
         }
