@@ -1,373 +1,256 @@
-/* styles/globals.css
-   ZeroGPT — polished global styles (dark theme default)
-   Paste this file into styles/globals.css
-*/
-
-/* ---------- Root tokens (colors / sizes / transitions) ---------- */
-:root{
-  --bg: #0b0c0f;
-  --panel: #0f1114;
-  --muted: #9aa4b2;
-  --text: #e6eef3;
-  --accent: #10a37f;       /* primary accent */
-  --accent-2: #2bd48a;     /* accent gradient 2 */
-  --danger: #ff6b6b;
-  --glass: rgba(255,255,255,0.03);
-  --glass-2: rgba(255,255,255,0.02);
-
-  --radius: 12px;
-  --radius-sm: 8px;
-  --gap: 12px;
-  --transition-fast: 180ms;
-  --transition-med: 300ms;
-  --shadow-soft: 0 6px 24px rgba(2,6,23,0.6);
-  --max-width-chat: 880px;
-}
-
-/* Light theme (optional toggle by adding .light-theme on body) */
-body.light-theme {
-  --bg: #f6f7fb;
-  --panel: #ffffff;
-  --muted: #566270;
-  --text: #0b1220;
-  --accent: #006c5f;
-  --accent-2: #008e72;
-  --glass: rgba(11,18,32,0.03);
-  --glass-2: rgba(11,18,32,0.02);
-  --shadow-soft: 0 8px 30px rgba(11,18,32,0.06);
-}
-
-/* ---------- Global resets & base ---------- */
-* { box-sizing: border-box; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-html,body,#__next { height: 100%; }
-body {
+/* ================= RESET ================= */
+* {
+  box-sizing: border-box;
   margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+html,
+body {
   height: 100%;
-  background: radial-gradient(1200px 600px at 10% 20%, rgba(16,163,127,0.04), transparent),
-              radial-gradient(800px 400px at 90% 80%, rgba(43,212,138,0.03), transparent),
-              var(--bg);
-  color: var(--text);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-  transition: background var(--transition-med) ease, color var(--transition-med) ease;
+  background: #0f0f0f;
+  color: #e5e5e5;
+}
+
+/* ================= ROOT ================= */
+.nova-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ================= HEADER ================= */
+.nova-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: #0f0f0f;
+}
+
+.nova-title {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  font-size: 15px;
+  color: #f5f5f5;
+}
+
+/* ================= MAIN ================= */
+.nova-main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
   overflow: hidden;
 }
 
-/* Make the app container full height */
-.app { display:flex; height:100vh; width:100%; }
-
-/* ---------- Sidebar ---------- */
-aside {
-  width: 300px;
-  min-width: 260px;
-  max-width: 320px;
-  background: linear-gradient(180deg, var(--panel), color-mix(in srgb, var(--panel) 85%, black 5%));
-  border-right: 1px solid rgba(255,255,255,0.02);
-  padding: 18px;
-  display:flex;
-  flex-direction:column;
-  gap: var(--gap);
-  box-shadow: var(--shadow-soft);
-  transition: transform var(--transition-fast) ease, width var(--transition-med) ease;
-}
-
-/* New chat button */
-aside .new {
-  display:flex;
-  gap:10px;
-  align-items:center;
-  padding:10px 12px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 85%, transparent), var(--accent-2));
-  color: white;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  box-shadow: 0 6px 20px rgba(16,163,127,0.12);
-  transition: transform var(--transition-fast) ease, box-shadow var(--transition-fast) ease, opacity var(--transition-fast);
-}
-aside .new:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(16,163,127,0.14); }
-
-/* Conversations list */
-.sidebar-list {
+.nova-messages {
+  width: 100%;
+  max-width: 760px;
+  padding: 24px 18px;
   overflow-y: auto;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  padding-right:6px;
+  scroll-behavior: smooth;
 }
 
-/* Each item */
-.conv-item {
-  padding:10px 12px;
-  display:flex;
-  gap:10px;
-  align-items:center;
-  border-radius: 10px;
-  cursor:pointer;
-  background: linear-gradient(180deg, transparent, transparent);
-  transition: background var(--transition-fast), transform var(--transition-fast);
-  color: var(--text);
-  opacity: 0.95;
-}
-.conv-item .title { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 190px; }
-.conv-item .preview { font-size:12px; color:var(--muted); margin-left:auto; }
-
-/* hover & active */
-.conv-item:hover { background: var(--glass); transform: translateY(-2px); }
-.conv-item.active { background: linear-gradient(90deg, rgba(16,163,127,0.08), rgba(43,212,138,0.02)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.02); }
-
-/* small utilities in sidebar */
-.sidebar-footer { margin-top: auto; display:flex; gap:10px; align-items:center; justify-content:space-between; }
-.user-avatar {
-  width:36px; height:36px; border-radius:8px; display:grid; place-items:center;
-  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
-  color:var(--text); font-weight:700;
-  box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+/* ================= EMPTY ================= */
+.nova-empty {
+  margin-top: 18vh;
+  text-align: center;
+  animation: fadeIn 0.6s ease;
 }
 
-/* ---------- Main chat area ---------- */
-main {
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  height:100vh;
-  overflow:hidden;
+.nova-logo-big {
+  opacity: 0.85;
+  margin-bottom: 22px;
 }
 
-/* header */
-.header {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:18px 28px;
-  border-bottom:1px solid rgba(255,255,255,0.02);
-  background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
-}
-.header .brand {
-  display:flex; gap:12px; align-items:center;
-}
-.logo-round {
-  width:44px; height:44px; border-radius:10px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  display:grid; place-items:center; font-weight:800; color:white;
-  box-shadow: 0 8px 30px rgba(16,163,127,0.12);
+.nova-empty h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 10px;
 }
 
-/* Chat container */
-.chat-container {
-  flex:1;
-  display:flex;
-  justify-content:center;
-  overflow:hidden;
-  padding: 20px;
+.nova-sub {
+  color: #9ca3af;
+  font-size: 14px;
 }
 
-/* chat column */
-.chat-column {
-  width:100%;
-  max-width: var(--max-width-chat);
-  display:flex;
-  flex-direction:column;
-  height: calc(100vh - 140px);
-  background: transparent;
+/* ================= MESSAGES ================= */
+.nova-message {
+  display: flex;
+  margin-bottom: 18px;
+  animation: slideUp 0.25s ease;
 }
 
-/* messages scroll area */
-.messages {
-  flex:1;
-  overflow-y:auto;
-  padding: 20px;
-  display:flex;
-  flex-direction:column;
-  gap:14px;
-  scrollbar-gutter: stable;
+.nova-message.user {
+  justify-content: flex-end;
 }
 
-/* message bubble base */
-.message {
-  max-width: 78%;
-  padding: 12px 14px;
-  border-radius: 12px;
-  line-height: 1.5;
-  position: relative;
-  word-break: break-word;
-  box-shadow: 0 6px 18px rgba(2,6,23,0.4);
-  animation: appearUp .22s var(--transition-fast) ease both;
+.nova-message.assistant {
+  justify-content: flex-start;
 }
 
-/* user vs assistant */
-.message.user {
-  margin-left: auto;
-  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
-  color: var(--text);
-  border-bottom-right-radius: 6px;
-  transform-origin: right center;
-}
-.message.assistant {
-  margin-right: auto;
-  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
-  color: var(--text);
-  border-bottom-left-radius: 6px;
-  transform-origin: left center;
-}
-
-/* system / meta small text */
-.msg-meta { font-size:12px; color:var(--muted); margin-top:6px; }
-
-/* code blocks and inline code */
-.message pre, .message code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
-}
-.message pre {
-  background: rgba(2,6,23,0.5);
-  padding: 12px;
-  border-radius: 8px;
-  overflow:auto;
-  margin: 8px 0 0 0;
+.nova-bubble {
+  max-width: 92%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  font-size: 15px;
+  line-height: 1.6;
   white-space: pre-wrap;
-  max-height: 360px;
-  box-shadow: none;
-  border-left: 3px solid rgba(16,163,127,0.9);
-}
-.message code {
-  padding: 2px 6px;
-  border-radius:6px;
-  background: rgba(0,0,0,0.25);
-  color: var(--text);
+  transition: background 0.2s ease;
 }
 
-/* bold/strong styling */
-.message strong { font-weight:700; color: var(--text); }
+/* user */
+.nova-message.user .nova-bubble {
+  background: #1a1a1a;
+  color: #f0f0f0;
+  border-bottom-right-radius: 6px;
+}
 
-/* typing indicator */
-.typing {
-  display:flex;
-  gap:6px;
-  align-items:center;
+/* assistant */
+.nova-message.assistant .nova-bubble {
+  background: #121212;
+  color: #e2e2e2;
+  border-bottom-left-radius: 6px;
 }
-.typing span {
-  width:8px; height:8px; border-radius:50%;
-  background: rgba(255,255,255,0.18);
-  opacity:0.9;
-  transform: translateY(0);
-  animation: typingBounce 1s infinite cubic-bezier(.2,.85,.32,1);
-}
-.typing span:nth-child(2) { animation-delay: 0.12s; }
-.typing span:nth-child(3) { animation-delay: 0.24s; }
 
-/* input area */
-.input-area {
-  padding:16px 20px;
-  border-top:1px solid rgba(255,255,255,0.02);
-  background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
-  display:flex;
-  gap:10px;
-  align-items:center;
+/* ================= TYPING ================= */
+.nova-bubble.typing {
+  display: flex;
+  gap: 6px;
 }
-.input-area textarea {
-  flex:1;
-  min-height:48px;
-  max-height:240px;
-  resize:none;
-  padding:12px 14px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(255,255,255,0.02);
-  color: var(--text);
+
+.nova-bubble.typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #9ca3af;
+  animation: blink 1.4s infinite both;
+}
+
+.nova-bubble.typing span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.nova-bubble.typing span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ================= INPUT ================= */
+.nova-input-area {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  background: linear-gradient(
+    to top,
+    rgba(15, 15, 15, 0.95),
+    rgba(15, 15, 15, 0.7),
+    rgba(15, 15, 15, 0)
+  );
+}
+
+.nova-input-wrapper {
+  width: 100%;
+  max-width: 760px;
+  position: relative;
+}
+
+.nova-input-wrapper textarea {
+  width: 100%;
+  resize: none;
+  padding: 14px 46px 14px 16px;
+  background: #121212;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  color: #f5f5f5;
+  font-size: 15px;
+  line-height: 1.6;
   outline: none;
-  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
-  font-size:15px;
+  transition: border 0.2s ease, background 0.2s ease;
 }
-.input-area textarea:focus {
-  box-shadow: 0 8px 30px rgba(16,163,127,0.08);
-  transform: translateY(-2px);
+
+.nova-input-wrapper textarea::placeholder {
+  color: #6b7280;
+}
+
+.nova-input-wrapper textarea:focus {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #141414;
 }
 
 /* send button */
-.send-btn {
-  padding:10px 12px;
-  border-radius: 10px;
-  border:none;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  color:white;
-  cursor:pointer;
-  font-weight:700;
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-}
-.send-btn:active { transform: translateY(1px); }
-.send-btn[disabled] { opacity:0.5; cursor:not-allowed; transform:none; }
-
-/* copy code button (absolute inside pre) */
-.copy-btn {
+.nova-send {
   position: absolute;
   right: 8px;
-  top: 8px;
-  padding:6px 8px;
-  border-radius: 8px;
-  background: rgba(0,0,0,0.32);
-  font-size:12px;
-  color:var(--text);
-  border:none;
-  cursor:pointer;
-  transition: opacity var(--transition-fast), transform var(--transition-fast);
-}
-.copy-btn:hover { transform: translateY(-2px); }
-
-/* scrollbars (Webkit) */
-.messages::-webkit-scrollbar, .sidebar-list::-webkit-scrollbar {
-  width:10px; height:10px;
-}
-.messages::-webkit-scrollbar-thumb, .sidebar-list::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-  border-radius:10px;
-  border: 2px solid transparent; background-clip: padding-box;
+  bottom: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #22c55e;
+  color: #0f0f0f;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
-/* responsive */
-@media (max-width: 900px) {
-  aside { display:none; }
-  .chat-column { padding: 14px; max-width:100%; }
-  .message { max-width: 92%; }
+.nova-send:hover {
+  transform: scale(1.05);
 }
 
-/* ---------- Animations ---------- */
-@keyframes appearUp {
-  from { opacity:0; transform: translateY(6px) scale(0.995); }
-  to { opacity:1; transform: translateY(0) scale(1); }
-}
-@keyframes typingBounce {
-  0% { transform: translateY(0); opacity: 0.5; }
-  30% { transform: translateY(-6px); opacity: 1; }
-  60% { transform: translateY(0); opacity: 0.6; }
-  100% { transform: translateY(0); opacity: 0.5; }
+.nova-send:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
-/* ---------- Small helpers ---------- */
-.center {
-  display:grid; place-items:center;
-}
-.kv { color:var(--muted); font-size:13px; }
-.small { font-size:13px; color:var(--muted); }
-
-/* ---------- Accessibility: focus states ---------- */
-button:focus, .conv-item:focus, .send-btn:focus, textarea:focus {
-  outline: 3px solid color-mix(in srgb, var(--accent) 20%, transparent);
-  outline-offset: 2px;
-}
-
-/* ---------- Nice finishing touch: floating subtle background shapes ---------- */
-.bg-orb {
-  position: absolute;
-  pointer-events: none;
-  filter: blur(60px);
-  opacity: 0.06;
+/* ================= ANIMS ================= */
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
 }
 
-/* example usage:
-  <div class="bg-orb" style="width:420px;height:420px;left:-80px;top:-120px;background:radial-gradient(circle at 30% 30%, var(--accent), transparent)"></div>
-*/
+@keyframes slideUp {
+  from {
+    transform: translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ================= MOBILE ================= */
+@media (max-width: 640px) {
+  .nova-empty h1 {
+    font-size: 22px;
+  }
+
+  .nova-messages {
+    padding: 16px 12px;
+  }
+
+  .nova-input-area {
+    padding: 14px;
+  }
+}
