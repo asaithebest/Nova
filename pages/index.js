@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import Image from "next/image";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
@@ -9,42 +10,28 @@ export default function Home() {
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    if (messages.length > 0) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, loading]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   async function sendMessage(e) {
-    e?.preventDefault();
-    if (!input.trim() || loading) return;
+    e.preventDefault();
+    if (!input.trim()) return;
 
     const newMessages = [...messages, { role: "user", content: input }];
     setMessages(newMessages);
     setInput("");
     setLoading(true);
 
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
-      });
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: newMessages })
+    });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "API error");
-
-      setMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
-    } catch (err) {
-      setMessages(prev => [
-        ...prev,
-        { role: "assistant", content: "Error: " + err.message },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+    const data = await res.json();
+    setMessages([...newMessages, { role: "assistant", content: data.reply }]);
+    setLoading(false);
   }
-
-  const isEmpty = messages.length === 0;
 
   return (
     <>
@@ -52,219 +39,212 @@ export default function Home() {
         <title>NovaGPT</title>
       </Head>
 
-      {/* TOP LEFT */}
-      <div className="top-bar">
-        <Image src="/logo.png" alt="NovaGPT" width={22} height={22} />
-        <span>NovaGPT</span>
-      </div>
+      <main className="container">
+        <header className="topbar">
+          <span className="logo">NOVAGPT</span>
+        </header>
 
-      <div className={`page ${isEmpty ? "empty" : "chatting"}`}>
-        {/* CENTER ZONE */}
-        {isEmpty && (
-          <div className="center-zone">
-            <h1>How can I help you today?</h1>
+        <section className="chat">
+          {messages.length === 0 && (
+            <div className="empty">
+              <h1>How can I help you today?</h1>
+            </div>
+          )}
 
-            <form className="input-pill" onSubmit={sendMessage}>
-              <button type="button" className="icon">＋</button>
+          {messages.map((m, i) => (
+            <div key={i} className={`bubble ${m.role}`}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {m.content}
+              </ReactMarkdown>
+            </div>
+          ))}
 
-              <input
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                placeholder="Message NovaGPT"
-              />
+          {loading && (
+            <div className="bubble assistant">Typing…</div>
+          )}
+          <div ref={bottomRef} />
+        </section>
 
-              <button
-                type="submit"
-                className="send"
-                disabled={!input.trim()}
-              >
-                ↑
-              </button>
-            </form>
+        <form className="input-zone" onSubmit={sendMessage}>
+          <div className="input-pill">
+            <button type="button" className="icon">+</button>
+
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder="ASK NOVAGPT"
+            />
+
+            <button type="button" className="icon">🎤</button>
+
+            <button className="send" disabled={!input.trim()}>
+              ↑
+            </button>
           </div>
-        )}
-
-        {/* CHAT */}
-        {!isEmpty && (
-          <>
-            <main className="chat">
-              {messages.map((m, i) => (
-                <div key={i} className={`msg ${m.role}`}>
-                  <div className="bubble">{m.content}</div>
-                </div>
-              ))}
-
-              {loading && (
-                <div className="msg assistant">
-                  <div className="bubble typing">Thinking…</div>
-                </div>
-              )}
-
-              <div ref={bottomRef} />
-            </main>
-
-            {/* BOTTOM INPUT */}
-            <form className="bottom-input" onSubmit={sendMessage}>
-              <div className="input-pill">
-                <button type="button" className="icon">＋</button>
-
-                <input
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  placeholder="Message NovaGPT"
-                />
-
-                <button
-                  type="submit"
-                  className="send"
-                  disabled={!input.trim()}
-                >
-                  ↑
-                </button>
-              </div>
-            </form>
-          </>
-        )}
-      </div>
+        </form>
+      </main>
 
       <style jsx>{`
+        * {
+          box-sizing: border-box;
+        }
+
         body {
-          margin: 0;
-          background: #202020;
-          color: #fff;
-          font-family: system-ui, sans-serif;
+          background: #1e1e1e;
         }
 
-        .top-bar {
-          position: fixed;
-          top: 12px;
-          left: 16px;
-          display: flex;
-          gap: 8px;
-          align-items: center;
-          font-weight: 600;
-          z-index: 10;
-          opacity: 0.9;
-        }
-
-        .page {
-          min-height: 100vh;
-          transition: all 0.4s ease;
-        }
-
-        /* EMPTY STATE */
-        .center-zone {
+        .container {
           height: 100vh;
           display: flex;
           flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 28px;
+          color: white;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont;
         }
 
-        .center-zone h1 {
-          font-size: 28px;
-          font-weight: 400;
-          text-align: center;
+        .topbar {
+          padding: 14px 24px;
+          border-bottom: 1px solid #2a2a2a;
         }
 
-        /* CHAT */
+        .logo {
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          font-size: 13px;
+        }
+
         .chat {
-          max-width: 760px;
-          margin: 0 auto;
-          padding: 120px 20px 120px;
+          flex: 1;
+          overflow-y: auto;
+          padding: 32px 20px 120px;
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          align-items: center;
         }
 
-        .msg {
-          display: flex;
-          animation: appear 0.25s ease;
+        .empty {
+          margin-top: 25vh;
+          text-align: center;
+          opacity: 0;
+          animation: fade 0.6s ease forwards;
         }
 
-        .msg.user {
-          justify-content: flex-end;
+        .empty h1 {
+          font-weight: 500;
+          color: #e5e5e5;
         }
 
         .bubble {
-          max-width: 80%;
-          padding: 14px 16px;
+          max-width: 720px;
+          width: 100%;
+          padding: 14px 18px;
+          margin-bottom: 18px;
+          line-height: 1.6;
+          font-size: 15px;
+          animation: fadeUp 0.3s ease;
+        }
+
+        .bubble.user {
+          background: #2b2b2b;
+          border-radius: 14px;
+        }
+
+        .bubble.assistant {
+          background: transparent;
+        }
+
+        .bubble pre {
           background: #111;
-          border-radius: 12px;
-          line-height: 1.55;
+          padding: 14px;
+          border-radius: 10px;
+          overflow-x: auto;
         }
 
-        .typing {
-          opacity: 0.6;
-          font-style: italic;
+        .bubble code {
+          background: #111;
+          padding: 2px 6px;
+          border-radius: 6px;
+          font-family: monospace;
         }
 
-        /* INPUT */
+        .bubble strong {
+          font-weight: 600;
+        }
+
+        .bubble ul {
+          padding-left: 20px;
+        }
+
+        .bubble li {
+          margin-bottom: 6px;
+        }
+
+        .input-zone {
+          position: fixed;
+          bottom: 24px;
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          pointer-events: none;
+        }
+
         .input-pill {
+          pointer-events: all;
           display: flex;
           align-items: center;
-          gap: 10px;
-          background: #2a2a2a;
+          background: #2b2b2b;
           border-radius: 999px;
-          padding: 10px 12px;
+          padding: 8px 14px;
           width: 560px;
           max-width: calc(100vw - 32px);
+          gap: 10px;
+          box-shadow: inset 0 0 0 1px #333;
         }
 
         .input-pill input {
           flex: 1;
-          background: transparent;
+          background: none;
           border: none;
           outline: none;
           color: white;
-          font-size: 14px;
+          font-size: 13px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
         }
 
         .icon {
-          background: none;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
           border: none;
+          background: transparent;
           color: #aaa;
-          font-size: 18px;
           cursor: pointer;
         }
 
+        .icon:hover {
+          background: #3a3a3a;
+          color: white;
+        }
+
         .send {
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          border: none;
           background: white;
           color: black;
-          border: none;
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
           cursor: pointer;
         }
 
         .send:disabled {
           opacity: 0.3;
+          cursor: default;
         }
 
-        .bottom-input {
-          position: fixed;
-          bottom: 20px;
-          left: 0;
-          width: 100%;
-          display: flex;
-          justify-content: center;
-          animation: slideUp 0.4s ease;
-        }
-
-        @keyframes slideUp {
-          from {
-            transform: translateY(30px);
-            opacity: 0;
-          }
-          to {
-            transform: none;
-            opacity: 1;
-          }
-        }
-
-        @keyframes appear {
+        @keyframes fadeUp {
           from {
             opacity: 0;
             transform: translateY(6px);
@@ -272,6 +252,12 @@ export default function Home() {
           to {
             opacity: 1;
             transform: none;
+          }
+        }
+
+        @keyframes fade {
+          to {
+            opacity: 1;
           }
         }
       `}</style>
