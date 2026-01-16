@@ -1,447 +1,500 @@
 // pages/index.js
 import { useEffect, useRef, useState } from "react";
-import Head from "next/head";
+
+/**
+ * NovaGPT — Single-file Next.js page (UI-only)
+ * - No external deps
+ * - Persists conversations & messages to localStorage
+ * - Centered ChatGPT-like layout (grey / white only)
+ * - File attachments (frontend only)
+ * - Basic markdown formatting (bold, italic, lists, inline code, code blocks, hr)
+ * - Copy message button, rename/delete convs, create convs
+ * - Auto-resize textarea, mobile friendly
+ * - Simulated streaming when no backend available (falls back to echo)
+ *
+ * To connect a backend, post to /api/chat with { message, conversationId, files }.
+ */
+
+function uid(prefix = "") {
+  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function simpleMarkdownToHtml(text = "") {
+  // escape HTML
+  const esc = (s) =>
+    s
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+
+  // code blocks ```lang\n...\n```
+  let out = esc(text);
+
+  out = out.replace(/```([\s\S]*?)```/g, (m, code) => {
+    return `<pre class="md-code"><code>${code.replaceAll(
+      "&lt;",
+      "<"
+    )}</code></pre>`;
+  });
+
+  // inline code `x`
+  out = out.replace(/`([^`]+)`/g, (m, c) => `<code class="md-inline">${c}</code>`);
+
+  // bold **text**
+  out = out.replace(/\*\*(.*?)\*\*/g, (m, t) => `<strong>${t}</strong>`);
+
+  // italic *text* or _text_
+  out = out.replace(/(^|[^*])\*(?!\s)(.*?)\*(?!\*)/g, (m, s, t) => `${s}<em>${t}</em>`);
+  out = out.replace(/_(.*?)_/g, (m, t) => `<em>${t}</em>`);
+
+  // horizontal rule
+  out = out.replace(/(^|\n)---(\n|$)/g, "<hr class='md-hr'/>");
+
+  // unordered list
+  out = out.replace(/(^|\n)[\-\+\*] (.+?)(?=\n|$)/g, (m, p1, item) => {
+    return `\n<ul><li>${item}</li></ul>\n`;
+  });
+  // merge successive ULs
+  out = out.replace(/<\/ul>\s*<ul>/g, "");
+
+  // ordered list
+  out = out.replace(/(^|\n)\d+\. (.+?)(?=\n|$)/g, (m, p1, item) => {
+    return `\n<ol><li>${item}</li></ol>\n`;
+  });
+  out = out.replace(/<\/ol>\s*<ol>/g, "");
+
+  // line breaks -> <br>
+  out = out.replace(/\n/g, "<br>");
+
+  return out;
+}
+
+function Message({ m, onCopy }) {
+  return (
+    <div className={`msg ${m.role}`}>
+      <div className="avatar">{m.role === "user" ? "U" : "N"}</div>
+      <div className="bubble">
+        <div
+          className="content"
+          dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(m.content) }}
+        />
+        {m.files?.length > 0 && (
+          <div className="files">
+            {m.files.map((f) => (
+              <div key={f.id} className="file">
+                📎 <span className="file-name">{f.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="msg-actions">
+          <button onClick={() => onCopy(m.content)}>Copy</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
-  const [messages, setMessages] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("nova_messages") || "[]");
-    } catch {
-      return [];
-    }
-  });
+  const [conversations, setConversations] = useState([]);
+  const [activeConvId, setActiveConvId] = useState(null);
   const [input, setInput] = useState("");
-  const [isSending, setIsSending] = useState(false);
   const [attachments, setAttachments] = useState([]);
-  const [theme, setTheme] = useState("light"); // keep for future toggle
-  const scrollRef = useRef(null);
+  const [loading, setLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const bottomRef = useRef(null);
   const textareaRef = useRef(null);
 
+  // load from localStorage
   useEffect(() => {
-    localStorage.setItem("nova_messages", JSON.stringify(messages));
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    try {
+      const saved = JSON.parse(localStorage.getItem("novagpt_conversations") || "[]");
+      setConversations(saved);
+      if (saved.length > 0) setActiveConvId(saved[0].id);
+    } catch {
+      setConversations([]);
     }
-  }, [messages]);
+  }, []);
 
+  // save
   useEffect(() => {
-    // auto-resize textarea
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 240) + "px";
+    localStorage.setItem("novagpt_conversations", JSON.stringify(conversations));
+  }, [conversations]);
+
+  // scroll to bottom
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [activeConvId, conversations, loading]);
+
+  // textarea auto resize
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 300) + "px";
   }, [input]);
 
-  function pushMessage(role, content, meta = {}) {
-    setMessages((m) => {
-      const next = [...m, { role, content, meta, id: Date.now() + Math.random() }];
-      return next;
+  const activeConv = conversations.find((c) => c.id === activeConvId);
+
+  function createNewConversation() {
+    const conv = { id: uid("conv_"), title: "New chat", messages: [], createdAt: Date.now() };
+    setConversations((s) => [conv, ...s]);
+    setActiveConvId(conv.id);
+    setInput("");
+    setAttachments([]);
+  }
+
+  function renameConversation(id) {
+    const title = prompt("New conversation title:");
+    if (!title) return;
+    setConversations((s) => s.map((c) => (c.id === id ? { ...c, title } : c)));
+  }
+
+  function deleteConversation(id) {
+    if (!confirm("Delete this conversation?")) return;
+    setConversations((s) => s.filter((c) => c.id !== id));
+    if (activeConvId === id) {
+      setActiveConvId(null);
+    }
+  }
+
+  function pushMessageToConv(convId, msg) {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === convId ? { ...c, messages: [...c.messages, msg] } : c))
+    );
+  }
+
+  function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAttachments((a) => [...a, { id: uid("f_"), name: file.name, data: reader.result }]);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  function removeAttachment(id) {
+    setAttachments((a) => a.filter((x) => x.id !== id));
+  }
+
+  async function sendMessage() {
+    if ((!input || !input.trim()) && attachments.length === 0) return;
+    if (!activeConvId) {
+      createNewConversation();
+      await new Promise((r) => setTimeout(r, 80)); // wait a tick for conv to be created
+    }
+    const convId = activeConvId || (conversations[0] && conversations[0].id);
+    const userMsg = { id: uid("m_"), role: "user", content: input.trim(), files: attachments };
+    pushMessageToConv(convId, userMsg);
+    setInput("");
+    setAttachments([]);
+    setLoading(true);
+
+    // try to call backend first
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMsg.content, conversationId: convId, files: attachments })
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const aiText = data.reply ?? data?.choices?.[0]?.message?.content ?? "No response.";
+      // if streaming not available, simple push
+      const assistantMsg = { id: uid("m_"), role: "assistant", content: aiText, files: [] };
+      pushMessageToConv(convId, assistantMsg);
+    } catch (err) {
+      // fallback: simulated short streaming echo
+      const fallback = `Echo: ${userMsg.content}`;
+      await simulateStreaming(convId, fallback);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function simulateStreaming(convId, text) {
+    const id = uid("m_");
+    pushMessageToConv(convId, { id, role: "assistant", content: "", files: [] });
+    let current = "";
+    for (let i = 0; i < text.length; i++) {
+      current += text[i];
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: c.messages.map((m) => (m.id === id ? { ...m, content: current } : m)) }
+            : c
+        )
+      );
+      // small delay to simulate streaming
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 10 + Math.random() * 25));
+    }
+  }
+
+  function onCopy(text) {
+    navigator.clipboard?.writeText(text).then(() => {
+      // brief visual feedback could be added
     });
   }
 
-  async function handleFileChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // optimistic attach
-    const temp = { name: file.name, size: file.size, uploading: true };
-    setAttachments((a) => [...a, temp]);
-
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: form });
-      const json = await res.json();
-      if (json?.ok && json.file) {
-        // replace last temp with returned file
-        setAttachments((a) => {
-          const copy = [...a];
-          const idx = copy.findIndex((c) => c.uploading);
-          if (idx >= 0) copy[idx] = { ...json.file, uploading: false };
-          else copy.push({ ...json.file, uploading: false });
-          return copy;
-        });
-      } else {
-        throw new Error(json?.error || "Upload failed");
-      }
-    } catch (err) {
-      console.error("upload err", err);
-      // remove uploading placeholder
-      setAttachments((a) => a.filter((x) => !x.uploading));
-      alert("Upload failed: " + (err?.message || err));
-    } finally {
-      // clear file input value so same file can be reselected
-      e.target.value = "";
-    }
-  }
-
-  async function sendMessage(e) {
-    e?.preventDefault();
-    const text = input.trim();
-    if (!text && attachments.length === 0) return;
-
-    // assemble user content (include parsedText from attachments if present)
-    let content = text;
-    if (attachments.length) {
-      const attTexts = attachments
-        .map((a) => (a.parsedText ? `\n\n[FILE:${a.originalFilename || a.filename}]\n${a.parsedText}` : `\n\n[FILE:${a.originalFilename || a.filename}]`))
-        .join("");
-      content = content + attTexts;
-    }
-
-    pushMessage("user", content, { attachments: attachments.map((a) => a.originalFilename || a.filename || a.name) });
-    setInput("");
-    setAttachments([]);
-    setIsSending(true);
-
-    // Prepare messages history to send to API (limit tokens by slicing last n)
-    const historyForApi = messages.concat([{ role: "user", content }]).slice(-20).map((m) => ({ role: m.role, content: m.content }));
-
-    // call streaming endpoint
-    try {
-      const res = await fetch("/api/chat?stream=1", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: historyForApi })
-      });
-
-      // If server didn't return a stream, fallback to normal JSON
-      if (!res.ok) {
-        const txt = await res.text();
-        pushMessage("assistant", `Erreur: ${txt}`);
-        setIsSending(false);
-        return;
-      }
-
-      // Create an assistant placeholder message and update with chunks
-      const assistantId = Date.now() + Math.random();
-      setMessages((m) => [...m, { role: "assistant", content: "", id: assistantId }]);
-
-      // If streaming, read chunks
-      if (res.body && res.body.getReader) {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let done = false;
-        let accumulated = "";
-        while (!done) {
-          const { value, done: d } = await reader.read();
-          done = d;
-          if (value) {
-            const chunk = decoder.decode(value, { stream: true });
-            // append chunk to accumulated and update the assistant message
-            accumulated += chunk;
-            setMessages((prev) =>
-              prev.map((m) => (m.id === assistantId ? { ...m, content: accumulated } : m))
-            );
-            // auto-scroll
-            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-          }
-        }
-      } else {
-        // not streaming: parse JSON
-        const json = await res.json();
-        const reply = json.reply || json.message || JSON.stringify(json);
-        setMessages((m) => m.map((x) => (x.id === assistantId ? { ...x, content: reply } : x)));
-      }
-    } catch (err) {
-      console.error(err);
-      pushMessage("assistant", `Erreur réseau: ${err?.message || err}`);
-    } finally {
-      setIsSending(false);
-    }
-  }
-
-  function removeAttachment(idx) {
-    setAttachments((a) => a.filter((_, i) => i !== idx));
-  }
-
-  function clearConversation() {
-    if (confirm("Clear conversation?")) {
-      setMessages([]);
-      localStorage.removeItem("nova_messages");
-    }
+  function exportConversation(conv) {
+    const content = conv.messages.map((m) => `${m.role.toUpperCase()}:\n${m.content}\n`).join("\n---\n");
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${conv.title || "conversation"}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
-    <>
-      <Head>
-        <title>NovaGPT</title>
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-      </Head>
-
-      <div className="page">
-        <header className="topbar">
+    <div className="page">
+      <header className="topbar">
+        <div className="left">
+          <img src="/logo.png" alt="Nova" className="logo" />
           <div className="brand">
-            <img src="/logo.png" alt="logo" className="logo" />
-            <span className="brand-text">NovaGPT</span>
+            <div className="brand-title">NovaGPT</div>
+            <div className="brand-sub">AI Assistant</div>
           </div>
-          <div className="actions">
-            <button onClick={clearConversation} className="ghost">Clear</button>
-            <button className="ghost" onClick={() => { setTheme((t) => (t === "light" ? "dark" : "light")); }}>
-              Theme
+        </div>
+
+        <div className="right">
+          <button
+            className="icon-btn hide-on-mobile"
+            onClick={() => {
+              setSidebarOpen((s) => !s);
+            }}
+            aria-label="Toggle sidebar"
+          >
+            ☰
+          </button>
+        </div>
+      </header>
+
+      <main className="main">
+        <aside className={`sidebar ${sidebarOpen ? "open" : "closed"}`}>
+          <div className="sidebar-actions">
+            <button className="new-btn" onClick={createNewConversation}>
+              + New chat
             </button>
           </div>
-        </header>
 
-        <main className="centerArea">
-          <div className="chatContainer">
-            <div ref={scrollRef} className="messages" aria-live="polite">
-              {messages.length === 0 && (
-                <div className="emptyState">
-                  <h2>Welcome to NovaGPT</h2>
-                  <p>Ask anything — attach a PDF or image to analyze. Streaming replies supported.</p>
+          <div className="convs">
+            {conversations.length === 0 && <div className="empty">No conversations yet</div>}
+            {conversations.map((c) => (
+              <div
+                key={c.id}
+                className={`conv ${c.id === activeConvId ? "active" : ""}`}
+                onClick={() => setActiveConvId(c.id)}
+              >
+                <div className="conv-title">{c.title}</div>
+                <div className="conv-actions">
+                  <button title="Rename" onClick={(e) => { e.stopPropagation(); renameConversation(c.id); }}>✎</button>
+                  <button title="Export" onClick={(e) => { e.stopPropagation(); exportConversation(c); }}>⇩</button>
+                  <button title="Delete" onClick={(e) => { e.stopPropagation(); deleteConversation(c.id); }}>🗑</button>
                 </div>
-              )}
-
-              {messages.map((m) => (
-                <div key={m.id} className={`message ${m.role === "user" ? "fromUser" : "fromAssistant"}`}>
-                  <div className="bubble">
-                    <div className="meta">
-                      <strong>{m.role === "user" ? "You" : "Nova"}</strong>
-                    </div>
-                    <div className="content">
-                      {/* simple rendering: preserve newlines and basic code block style */}
-                      {m.content ? (
-                        <>
-                          {m.content.split("\n\n").map((block, i) => {
-                            const isCode = block.startsWith("```") && block.endsWith("```");
-                            if (isCode) {
-                              const code = block.replace(/```/g, "");
-                              return <pre key={i} className="codeBlock">{code}</pre>;
-                            }
-                            // small markdown-like bold/italic/simple replacement
-                            const html = block
-                              .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-                              .replace(/\*(.+?)\*/g, "<em>$1</em>")
-                              .replace(/`(.+?)`/g, "<code>$1</code>")
-                              .replace(/\n/g, "<br/>");
-                            return <div key={i} className="textBlock" dangerouslySetInnerHTML={{ __html: html }} />;
-                          })}
-                        </>
-                      ) : (
-                        <em className="muted">...</em>
-                      )}
-                    </div>
-
-                    {m.meta?.attachments?.length > 0 && (
-                      <div className="attachmentsRow">
-                        {m.meta.attachments.map((f, idx) => (
-                          <div key={idx} className="fileChip">📎 {f}</div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <form onSubmit={sendMessage} className="composer">
-              <div className="attachmentList">
-                {attachments.map((a, i) => (
-                  <div className="filePreview" key={i}>
-                    <span className="fileName">{a.originalFilename || a.filename || a.name}</span>
-                    <button type="button" className="removeBtn" onClick={() => removeAttachment(i)}>✕</button>
-                  </div>
-                ))}
               </div>
-
-              <div className="composerRow">
-                <label className="attachBtn" title="Attach file">
-                  📎
-                  <input type="file" onChange={handleFileChange} className="hiddenFile" />
-                </label>
-
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={isSending ? "Waiting for Nova..." : "Write a message... Shift+Enter for newline"}
-                  className="input"
-                  rows={1}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (!isSending) sendMessage();
-                    }
-                  }}
-                />
-
-                <button type="submit" className="sendBtn" disabled={isSending}>
-                  {isSending ? "Sending…" : "Send"}
-                </button>
-              </div>
-            </form>
+            ))}
           </div>
-        </main>
 
-        <style jsx>{`
-          :root {
-            --bg: #f6f7f8;
-            --panel: #ffffff;
-            --muted: #7d7d7d;
-            --accent: #111111;
-            --bubble-user: #e9e9e9;
-            --bubble-assistant: #ffffff;
-            --border: #e6e6e6;
-          }
+          <div className="sidebar-footer">
+            <small>Local only • Grey & white UI</small>
+          </div>
+        </aside>
 
-          .page {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            background: linear-gradient(180deg,var(--bg), #f2f2f2);
-            color: var(--accent);
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-          }
+        <section className="chat-area">
+          {!activeConv && (
+            <div className="center-empty">
+              <h1>How can NovaGPT help?</h1>
+              <p>Start by creating a new chat or selecting one from the left.</p>
+              <button className="new-btn big" onClick={createNewConversation}>
+                + New chat
+              </button>
+            </div>
+          )}
 
-          .topbar {
-            height: 64px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            border-bottom: 1px solid var(--border);
-            background: var(--panel);
-            position: sticky;
-            top: 0;
-            z-index: 20;
-          }
+          {activeConv && (
+            <>
+              <div className="chat-header">
+                <div className="chat-title">{activeConv.title}</div>
+                <div className="chat-header-actions">
+                  <button onClick={() => renameConversation(activeConv.id)}>Rename</button>
+                  <button onClick={() => exportConversation(activeConv)}>Export</button>
+                </div>
+              </div>
 
-          .brand { display:flex; align-items:center; gap:12px; }
-          .logo { width:36px; height:36px; object-fit:contain; filter: grayscale(1); }
-          .brand-text { font-weight:700; font-size:18px; letter-spacing: -0.3px; }
+              <div className="messages" aria-live="polite">
+                {activeConv.messages.map((m) => (
+                  <Message key={m.id} m={m} onCopy={onCopy} />
+                ))}
 
-          .actions .ghost {
-            background:transparent; border: 1px solid var(--border); padding:6px 10px; border-radius:8px; cursor:pointer;
-            color:var(--muted); margin-left:8px;
-          }
+                {loading && (
+                  <div className="assistant-typing">
+                    <div className="dot" />
+                    <div className="dot" />
+                    <div className="dot" />
+                  </div>
+                )}
 
-          .centerArea {
-            flex:1;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            padding: 28px 18px;
-          }
+                <div ref={bottomRef} />
+              </div>
 
-          .chatContainer {
-            width:100%;
-            max-width:820px;
-            height: calc(100vh - 160px);
-            display:flex;
-            flex-direction:column;
-            background: transparent;
-          }
+              <div className="composer">
+                <div className="attachments">
+                  {attachments.map((a) => (
+                    <div key={a.id} className="attach-pill">
+                      <span className="name">{a.name}</span>
+                      <button onClick={() => removeAttachment(a.id)}>✕</button>
+                    </div>
+                  ))}
+                </div>
 
-          .messages {
-            flex:1;
-            overflow:auto;
-            padding: 28px;
-            display:flex;
-            flex-direction:column;
-            gap:12px;
-            border-radius:12px;
-            scroll-behavior:smooth;
-          }
+                <div className="input-row">
+                  <textarea
+                    ref={textareaRef}
+                    className="input"
+                    placeholder="Message NovaGPT (Shift+Enter for new line)"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
+                  />
 
-          .emptyState {
-            margin:auto;
-            text-align:center;
-            color:var(--muted);
-          }
+                  <div className="controls">
+                    <label className="file-label" title="Attach file">
+                      📎
+                      <input type="file" onChange={handleFileChange} />
+                    </label>
 
-          .message {
-            display:flex;
-            width:100%;
-            animation: fadeIn 220ms ease;
-          }
-          .fromUser { justify-content:flex-end; }
-          .fromAssistant { justify-content:flex-start; }
+                    <button className="send-btn" onClick={sendMessage} disabled={loading}>
+                      {loading ? "Sending..." : "Send ▶"}
+                    </button>
+                  </div>
+                </div>
 
-          .bubble {
-            max-width: 78%;
-            background: var(--bubble-assistant);
-            border:1px solid var(--border);
-            padding: 12px 14px;
-            border-radius: 12px;
-            box-shadow: 0 1px 0 rgba(0,0,0,0.03);
-            color: var(--accent);
-            white-space: pre-wrap;
-          }
+                <div className="hints">
+                  <small>Supports **bold**, *italic*, `inline code`, lists, and ```code blocks```</small>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+      </main>
 
-          .fromUser .bubble { background: var(--bubble-user); }
+      <style jsx>{`
+        .page {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          background: #f6f6f6;
+          color: #111;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+            "Helvetica Neue", Arial;
+        }
+        .topbar {
+          height: 64px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 20px;
+          border-bottom: 1px solid #e6e6e6;
+          background: #fff;
+        }
+        .left { display:flex; align-items:center; gap:12px; }
+        .logo { width:36px; height:36px; object-fit:contain; filter: grayscale(100%); }
+        .brand-title { font-weight:700; font-size:16px; color:#111; }
+        .brand-sub { font-size:12px; color:#777; margin-top:2px; }
 
-          .meta { font-size:12px; color:var(--muted); margin-bottom:6px; }
-          .textBlock { font-size:15px; line-height:1.5; color:var(--accent); }
-          .muted { color:var(--muted); }
+        .main { display:flex; flex:1; height: calc(100vh - 64px); }
+        .sidebar {
+          width:280px;
+          border-right:1px solid #e6e6e6;
+          background:#fff;
+          padding:12px;
+          display:flex;
+          flex-direction:column;
+          transition: transform .22s ease;
+        }
+        .sidebar.closed { transform: translateX(-100%); position:absolute; z-index:100; }
+        .sidebar-actions { padding-bottom:8px; }
+        .new-btn { width:100%; padding:10px; border-radius:10px; border:1px solid #ddd; background:#f8f8f8; cursor:pointer; }
+        .new-btn.big { padding:14px 20px; margin-top:14px; font-size:16px; }
+        .convs { margin-top:10px; overflow:auto; flex:1; }
+        .conv { display:flex; justify-content:space-between; align-items:center; padding:10px; border-radius:8px; cursor:pointer; }
+        .conv:hover { background:#f2f2f2; }
+        .conv.active { background:#e9e9e9; }
+        .conv-title { font-size:14px; color:#111; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:170px; }
+        .conv-actions button { margin-left:6px; background:transparent; border:none; cursor:pointer; color:#666; }
 
-          .codeBlock {
-            background:#f4f4f4; padding:10px; border-radius:8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace; overflow:auto;
-          }
+        .sidebar-footer { padding-top:8px; font-size:12px; color:#666; }
 
-          .attachmentsRow { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
-          .fileChip { background:#fafafa; border:1px solid var(--border); padding:6px 8px; border-radius:999px; font-size:12px; color:var(--muted); }
+        .chat-area { flex:1; display:flex; flex-direction:column; align-items:center; background: linear-gradient(#f6f6f6, #fff); }
+        .center-empty { margin-top:80px; text-align:center; color:#222; }
+        .center-empty h1 { font-size:28px; margin-bottom:6px; }
+        .messages { width:100%; max-width:820px; padding:28px; display:flex; flex-direction:column; gap:12px; overflow:auto; min-height:200px; }
+        .chat-header { width:100%; max-width:820px; display:flex; justify-content:space-between; align-items:center; padding:12px 28px 0 28px; border-bottom:1px solid #eee; background:transparent; }
+        .chat-title { font-weight:700; color:#111; }
+        .chat-header-actions button { margin-left:8px; background:transparent; border:1px solid #eee; padding:6px 8px; border-radius:8px; cursor:pointer; }
 
-          .composer {
-            margin-top:10px;
-            padding: 12px;
-            background: rgba(255,255,255,0.8);
-            border-top: 1px solid var(--border);
-            border-radius: 12px;
-            backdrop-filter: blur(6px);
-          }
+        .msg { display:flex; gap:12px; align-items:flex-start; }
+        .msg.user { justify-content:flex-end; }
+        .avatar { width:36px; height:36px; border-radius:8px; background:#111; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; flex-shrink:0; }
+        .bubble { max-width:76%; background:#fff; border:1px solid #e9e9e9; padding:12px 12px; border-radius:12px; box-shadow:0 1px 0 rgba(0,0,0,0.02); }
+        .msg.user .bubble { background:#111; color:#fff; border-color:#111; }
+        .content { line-height:1.45; font-size:15px; color:inherit; word-break:break-word; white-space:pre-wrap; }
+        .md-inline { background:#eee; padding:2px 6px; border-radius:6px; font-family:monospace; font-size:13px; }
+        .md-code { background:#f3f3f3; padding:10px; border-radius:8px; overflow:auto; font-family:monospace; font-size:13px; }
+        .md-hr { border:none; border-top:1px solid #ddd; margin:8px 0; }
 
-          .attachmentList { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+        .files { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
+        .file { font-size:13px; background:#fafafa; padding:6px 8px; border-radius:8px; border:1px solid #eee; }
 
-          .filePreview { display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--border); padding:6px 8px; border-radius:10px; font-size:13px; }
-          .removeBtn { background:transparent; border:0; cursor:pointer; color:var(--muted); padding:2px 6px; border-radius:6px; }
+        .msg-actions { margin-top:8px; display:flex; gap:6px; }
+        .msg-actions button { font-size:12px; border-radius:8px; padding:6px 8px; border:1px solid #eee; background:transparent; cursor:pointer; }
 
-          .composerRow {
-            display:flex;
-            gap:8px;
-            align-items:stretch;
-          }
+        .assistant-typing { display:flex; gap:6px; align-items:center; padding:8px; }
+        .dot { width:8px; height:8px; background:#bbb; border-radius:50%; animation: pulse 1s infinite ease-in-out; }
+        .dot:nth-child(2) { animation-delay:.15s; }
+        .dot:nth-child(3) { animation-delay:.3s; }
+        @keyframes pulse { 0% { opacity:.4; transform:translateY(0); } 50% { opacity:1; transform:translateY(-4px);} 100% { opacity:.4; transform:translateY(0);} }
 
-          .attachBtn {
-            display:flex; align-items:center; justify-content:center; width:46px; border-radius:10px; border:1px solid var(--border); background:var(--panel); cursor:pointer; font-size:18px;
-          }
-          .hiddenFile { display:none; }
+        .composer { width:100%; max-width:820px; padding:12px 28px 36px 28px; }
+        .attachments { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+        .attach-pill { background:#fff; border:1px solid #eee; padding:6px 8px; border-radius:999px; display:flex; gap:8px; align-items:center; }
+        .input-row { display:flex; gap:12px; align-items:flex-end; background:transparent; }
+        .input { flex:1; min-height:46px; max-height:220px; padding:12px 14px; border-radius:12px; border:1px solid #e6e6e6; resize:none; background:#fff; font-size:15px; outline:none; }
+        .controls { display:flex; gap:8px; align-items:center; }
+        .file-label { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; border-radius:8px; border:1px solid #eee; cursor:pointer; background:#fff; }
+        .file-label input { display:none; }
+        .send-btn { padding:10px 14px; border-radius:10px; background:#111; color:#fff; border:none; cursor:pointer; }
 
-          .input {
-            flex:1;
-            padding:12px 14px;
-            border-radius:10px;
-            border:1px solid var(--border);
-            resize:none;
-            outline:none;
-            font-size:15px;
-            min-height:44px;
-            max-height:240px;
-          }
+        .hints { margin-top:8px; color:#777; font-size:13px; }
 
-          .sendBtn {
-            min-width:84px;
-            padding:10px 14px;
-            border-radius:10px;
-            border:0;
-            background:#111;
-            color:#fff;
-            cursor:pointer;
-            font-weight:600;
-          }
+        /* responsive */
+        @media (max-width: 880px) {
+          .sidebar { position:absolute; z-index:40; left:0; top:64px; bottom:0; background:#fff; transform:translateX(-100%); width:260px; }
+          .sidebar.open { transform:translateX(0); }
+          .chat-area { padding:0 12px; }
+          .hide-on-mobile { display:none; }
+        }
+      `}</style>
 
-          @keyframes fadeIn {
-            from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); }
-          }
-
-          /* responsive */
-          @media (max-width:720px) {
-            .chatContainer { height: calc(100vh - 120px); }
-            .bubble { max-width: 92%; }
-            .brand-text { display:none; }
-            .topbar { padding: 0 12px; }
-          }
-        `}</style>
-      </div>
-    </>
+      <style jsx global>{`
+        /* minimal resets */
+        html,body,#__next { height:100%; margin:0; }
+        * { box-sizing:border-box; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+      `}</style>
+    </div>
   );
 }
