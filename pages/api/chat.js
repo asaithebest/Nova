@@ -1,5 +1,4 @@
 // pages/api/chat.js
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method Not Allowed" });
@@ -11,7 +10,7 @@ export default async function handler(req, res) {
 
   const body = req.body || {};
   const messages = Array.isArray(body.messages) ? body.messages : [];
-  const model = body.model || process.env.MODEL || "gpt-4o";
+  const model = body.model || process.env.MODEL || "gpt-4";
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -32,11 +31,10 @@ export default async function handler(req, res) {
     });
 
     const text = await response.text();
-
     let data;
     try {
       data = JSON.parse(text);
-    } catch {
+    } catch (err) {
       return res.status(500).json({ message: "Réponse OpenAI non JSON", raw: text });
     }
 
