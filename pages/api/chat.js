@@ -1,92 +1,68 @@
 // pages/api/chat.js
-import fetch from "node-fetch"; // node 18+ global fetch exists, but keep node-fetch for compatibility
-const SYSTEM_PROMPT = "You are ZeroGPT, a large language model trained by ZeroGPT. Be helpful, precise and objective. Do not mention OpenAI or ChatGPT.";
+import fetch from "node-fetch";
+import { createMessage, getMessages } from "../../lib/storage.js";
+
+const OPENAI_KEY = process.env.OPENAI_API_KEY;
+
+if (!OPENAI_KEY) {
+  // do not throw at import time on dev/build; handler will return error
+}
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
+  if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: "OPENAI_API_KEY not set on server" });
 
-  const body = req.body || {};
-  const messages = Array.isArray(body.messages) ? body.messages : [];
-  const streamMode = !!body.stream || (req.query && req.query.stream === "1");
-
-  // validate API key
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({ error: "OPENAI_API_KEY not set on server" });
-  }
-
-  // build payload for OpenAI: include system + last messages
-  const payload = {
-    model: "gpt-4o", // adapte si tu veux un autre modèle
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      ...messages.slice(-20) // garde un historique limité
-    ],
-    temperature: typeof body.temperature === "number" ? body.temperature : 0.7,
-  };
-
-  // If the client asked streaming, proxy the OpenAI stream (SSE/chunks) to the client:
-  if (streamMode) {
-    try {
-      // request with streaming true
-      const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ...payload, stream: true }),
-      });
-
-      if (!openaiRes.ok) {
-        const text = await openaiRes.text();
-        return res.status(openaiRes.status).json({ error: text });
-      }
-
-      // set headers for client SSE/chunk streaming
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache, no-transform");
-      res.setHeader("Connection", "keep-alive");
-      res.flushHeaders?.();
-
-      const reader = openaiRes.body.getReader();
-      const decoder = new TextDecoder();
-
-      // read and forward chunks
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        // forward raw chunk (client should handle assembling)
-        res.write(chunk);
-      }
-
-      // end stream
-      res.write("\n\n");
-      return res.end();
-    } catch (err) {
-      console.error("Streaming proxy error:", err);
-      return res.status(500).json({ error: err.message || String(err) });
-    }
-  }
-
-  // Non-streaming: simple JSON response
   try {
+    const { message, conversationId, stream = false, systemPrompt } = req.body || {};
+    if (!message && !stream) return res.status(400).json({ error: "message required" });
+
+    // ensure conversation exists (frontend should create conv first)
+    let convId = conversationId;
+    if (!convId) {
+      // create a conv via storage createConversation if desired; but here we expect convId
+      convId = String(Date.now());
+    }
+
+    await createMessage({ conversationId: convId, role: "user", content: message || "" });
+
+    const history = await getMessages(convId);
+    // build messages for OpenAI
+    const messagesForAI = [
+      {
+        role: "system",
+        content:
+          systemPrompt ||
+          "You are NovaGPT assistant. Be helpful, short when appropriate, and speak the user's language."
+      },
+      ...history.map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }))
+    ];
+
+    // call OpenAI (non-streaming)
     const r = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: messagesForAI,
+        temperature: 0.7,
+        max_tokens: 1200
+      })
     });
 
     const json = await r.json();
-    if (!r.ok) return res.status(r.status).json({ error: json });
+    if (!r.ok) {
+      return res.status(r.status).json(json);
+    }
 
-    const reply = json.choices?.[0]?.message?.content ?? json.choices?.[0]?.text ?? JSON.stringify(json);
-    return res.status(200).json({ reply, raw: json });
+    const reply = json.choices?.[0]?.message?.content ?? json?.choices?.[0]?.text ?? "No reply";
+    const assistantMsg = await createMessage({ conversationId: convId, role: "assistant", content: reply });
+
+    return res.status(200).json({ reply, conversationId: convId, assistantMsg });
   } catch (err) {
-    console.error("chat api error", err);
-    return res.status(500).json({ error: err.message || String(err) });
+    console.error(err);
+    return res.status(500).json({ error: err?.message || String(err) });
   }
 }
