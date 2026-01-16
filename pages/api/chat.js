@@ -5,12 +5,12 @@ export default async function handler(req, res) {
   }
 
   if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({ message: "OPENAI_API_KEY non défini sur le serveur" });
+    return res.status(500).json({
+      message: "OPENAI_API_KEY non défini sur le serveur"
+    });
   }
 
-  const body = req.body || {};
-  const messages = Array.isArray(body.messages) ? body.messages : [];
-  const model = body.model || process.env.MODEL || "gpt-4";
+  const { messages = [], model = "gpt-4" } = req.body || {};
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -22,21 +22,14 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "Tu es Nova — assistant francophone, clair et utile." },
+          { role: "system", content: "Tu es Nova, assistant clair, utile et naturel." },
           ...messages.slice(-12)
         ],
-        temperature: 0.7,
-        max_tokens: 1000
+        temperature: 0.7
       })
     });
 
-    const text = await response.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      return res.status(500).json({ message: "Réponse OpenAI non JSON", raw: text });
-    }
+    const data = await response.json();
 
     if (!response.ok) {
       return res.status(response.status).json({
@@ -45,9 +38,12 @@ export default async function handler(req, res) {
       });
     }
 
-    const reply = data?.choices?.[0]?.message?.content ?? null;
-    return res.status(200).json({ reply, raw: data });
-  } catch (err) {
-    return res.status(500).json({ message: err?.message || "Erreur serveur" });
+    return res.status(200).json({
+      reply: data.choices[0].message.content
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || "Erreur serveur"
+    });
   }
 }
