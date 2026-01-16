@@ -53,25 +53,31 @@ export default function Home() {
       setFile(null);
     }
   }
+
   return (
     <>
       <Head>
         <title>NovaGPT</title>
-        <link rel="icon" href="/logo.png" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
       </Head>
 
-      <main className="app">
-        <div className="chat">
+      <div className="app">
+        <header>
+          <Image src="/logo.png" alt="NovaGPT" width={28} height={28} />
+          <span>NovaGPT</span>
+        </header>
+
+        <main className={messages.length === 0 ? "empty" : ""}>
           {messages.length === 0 && (
-            <div className="empty">
-              <h1>NovaGPT</h1>
-              <p>Ask anything. Upload files. Analyze images & PDFs.</p>
-            </div>
+            <h1 className="welcome">How can I help you?</h1>
           )}
 
           {messages.map((m, i) => (
             <div key={i} className={`msg ${m.role}`}>
-              <div className="bubble">{m.content}</div>
+              <div
+                className="bubble"
+                dangerouslySetInnerHTML={{ __html: format(m.content) }}
+              />
             </div>
           ))}
 
@@ -80,165 +86,37 @@ export default function Home() {
               <div className="bubble typing">Thinking…</div>
             </div>
           )}
-
           <div ref={bottomRef} />
-        </div>
+        </main>
 
-        <form className="inputBar" onSubmit={sendMessage}>
+        <footer className={messages.length === 0 ? "centered" : ""}>
           <label className="upload">
             +
             <input
               type="file"
-              accept=".pdf,image/*,.txt"
               hidden
               onChange={(e) => setFile(e.target.files[0])}
             />
           </label>
 
-          <input
+          <textarea
             placeholder="Message NovaGPT"
             value={input}
+            rows={1}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
           />
 
-          <button type="submit">➤</button>
-        </form>
-      </main>
-
-      <style jsx>{`
-        * {
-          box-sizing: border-box;
-        }
-
-        body {
-          margin: 0;
-          font-family: system-ui, sans-serif;
-          background: #0f0f0f;
-          color: white;
-        }
-
-        .app {
-          height: 100vh;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-
-        .chat {
-          flex: 1;
-          width: 100%;
-          max-width: 720px;
-          padding: 40px 20px;
-          overflow-y: auto;
-        }
-
-        .empty {
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          opacity: 0;
-          animation: fadeIn 0.6s forwards;
-        }
-
-        .empty h1 {
-          font-size: 42px;
-          margin-bottom: 8px;
-        }
-
-        .empty p {
-          opacity: 0.6;
-        }
-
-        .msg {
-          display: flex;
-          margin-bottom: 16px;
-          animation: slideUp 0.25s ease;
-        }
-
-        .msg.user {
-          justify-content: flex-end;
-        }
-
-        .bubble {
-          max-width: 85%;
-          padding: 14px 16px;
-          border-radius: 14px;
-          line-height: 1.45;
-          background: #1f1f1f;
-        }
-
-        .msg.user .bubble {
-          background: #2d2d2d;
-        }
-
-        .typing {
-          opacity: 0.6;
-          font-style: italic;
-        }
-
-        .inputBar {
-          width: 100%;
-          max-width: 720px;
-          display: flex;
-          align-items: center;
-          padding: 12px;
-          border-top: 1px solid #222;
-          background: #0f0f0f;
-        }
-
-        .upload {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          border: 1px solid #333;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          margin-right: 10px;
-        }
-
-        .inputBar input {
-          flex: 1;
-          background: #1a1a1a;
-          border: none;
-          color: white;
-          padding: 12px;
-          border-radius: 20px;
-          outline: none;
-        }
-
-        .inputBar button {
-          margin-left: 10px;
-          background: white;
-          color: black;
-          border: none;
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          cursor: pointer;
-          font-size: 16px;
-        }
-
-        @keyframes fadeIn {
-          to {
-            opacity: 1;
-          }
-        }
-
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(6px);
-          }
-          to {
-            opacity: 1;
-            transform: none;
-          }
-        }
-      `}</style>
+          <button onClick={send} disabled={loading}>
+            ➤
+          </button>
+        </footer>
+      </div>
     </>
   );
 }
